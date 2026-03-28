@@ -33,12 +33,11 @@ To enable AI:
 
 1. Install GitHub Copilot CLI via winget:
    ```
-   winget install GitHub.GitHubCLI
+   winget install GitHub.Copilot
    ```
 2. Log in:
    ```
-   gh auth login
-   gh extension install github/gh-copilot
+   copilot login
    ```
 3. A valid **GitHub Copilot subscription** is required.
 
