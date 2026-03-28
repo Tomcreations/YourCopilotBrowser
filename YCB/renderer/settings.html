@@ -648,6 +648,11 @@
       }
     }
   };
+
+  // Request user ID from C# as soon as the page is ready
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.postMessage({ type: 'settings:getUserId' });
+  }
 </script>
 </body>
 </html>

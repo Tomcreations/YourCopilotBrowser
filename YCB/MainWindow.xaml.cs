@@ -1390,6 +1390,28 @@ public partial class MainWindow : Window
                     ClearDownloads();
                     break;
                     
+                case "settings:getUserId":
+                    if (sender is CoreWebView2 swv)
+                    {
+                        var uid = JsonSerializer.Serialize(ErrorReporter.UserId);
+                        await swv.ExecuteScriptAsync($@"
+                            (function() {{
+                                var el = document.getElementById('about-user-id');
+                                if (!el) return;
+                                var id = {uid};
+                                el.textContent = id;
+                                el.onclick = function() {{
+                                    navigator.clipboard.writeText(id).then(function() {{
+                                        el.textContent = 'Copied!';
+                                        el.style.color = '#81c995';
+                                        setTimeout(function() {{ el.textContent = id; el.style.color = ''; }}, 1500);
+                                    }});
+                                }};
+                            }})();
+                        ");
+                    }
+                    break;
+                    
                 case "downloads:openFile":
                     if (message.TryGetValue("path", out var pathElement))
                     {
