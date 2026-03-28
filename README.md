@@ -42,3 +42,34 @@ To enable AI:
 3. A valid **GitHub Copilot subscription** is required.
 
 > **Note:** We do not host, provide, or charge for the AI. The AI is powered by GitHub Copilot, a service operated and billed exclusively by **GitHub (a Microsoft company)**. Any subscription or billing queries should be directed to GitHub.
+
+## Diagnostic Data
+
+YCB Browser collects diagnostic data by default to help us find and fix bugs. Here is exactly what is and is not logged:
+
+**What we do log:**
+- App launch info (app version, WebView2 version, .NET version, Windows version)
+- Tab open and close counts
+- Navigation errors (domain only, never the full URL)
+- Download outcomes (file type and size only, never filenames or content)
+- Password prompt shown/saved events (domain only, never your actual passwords)
+- UI freezes and crash reports
+
+**What we never log:**
+- URLs you visit
+- Your browsing history
+- Passwords or any credentials
+- File names or file content
+- Any personally identifiable information
+
+**Why we do this:**
+
+Early on we had a bug where YCB worked perfectly on one machine but crashed on startup on another. We had no idea why — no error, no clue. Once we added the error logger we could see exactly what was different (a missing WebView2 version) and fix it in minutes. Without it we would have been completely in the dark. That one case alone is why this exists.
+
+You can turn this off at any time in **Settings > Data & Privacy**.
+
+## Support & Your User ID
+
+Every install of YCB has a unique **User ID** which you can find in **Settings > About**. This ID is anonymous and is only used to match your error logs if you contact support.
+
+If you are having an issue, open **Settings > About**, copy your User ID, and include it when reaching out to support. With it we can look up your specific error logs and tell you whether the problem is on your end or ours — and how to fix it either way.
