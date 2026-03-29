@@ -3084,38 +3084,38 @@ public partial class MainWindow : Window
     private void ShowDownloadShelf(DownloadItem item)
     {
         DownloadShelf.Visibility = Visibility.Visible;
-        DownloadShelfRow.Height = new GridLength(68);
-        
+        DownloadShelfRow.Height = new GridLength(72);
+
         var itemBorder = new Border
         {
             Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3c3d41")!),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(12, 8, 12, 8),
             Margin = new Thickness(0, 0, 8, 0),
-            MinWidth = 190,
-            MaxWidth = 260,
+            MinWidth = 200,
+            MaxWidth = 280,
             Tag = item.FilePath
         };
-        
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        
-        // File icon
+
+        var outer = new StackPanel { Orientation = Orientation.Vertical };
+
+        // Top row: icon + name + status
+        var topGrid = new Grid();
+        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
         var iconPath = new WpfPath
         {
             Data = Geometry.Parse("M4 2h8l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z"),
             Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!),
             StrokeThickness = 1.5,
-            Width = 20,
-            Height = 24,
+            Width = 20, Height = 24,
             Stretch = Stretch.Uniform,
             Margin = new Thickness(0, 0, 10, 0)
         };
         Grid.SetColumn(iconPath, 0);
-        grid.Children.Add(iconPath);
-        
-        // Info
+        topGrid.Children.Add(iconPath);
+
         var infoStack = new StackPanel();
         var nameBlock = new TextBlock
         {
@@ -3129,41 +3129,94 @@ public partial class MainWindow : Window
             Text = item.Status,
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9aa0a6")!),
             FontSize = 11,
-            Margin = new Thickness(0, 3, 0, 0)
+            Margin = new Thickness(0, 2, 0, 0)
         };
         infoStack.Children.Add(nameBlock);
         infoStack.Children.Add(statusBlock);
         Grid.SetColumn(infoStack, 1);
-        grid.Children.Add(infoStack);
-        
-        itemBorder.Child = grid;
-        itemBorder.MouseLeftButtonUp += (s, e) =>
+        topGrid.Children.Add(infoStack);
+        outer.Children.Add(topGrid);
+
+        // Action buttons row (hidden until complete)
+        var btnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 5, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Tag = "actionRow"
+        };
+
+        var openBtn = MakeShelfButton("Open");
+        openBtn.Click += (s, e) =>
         {
             if (File.Exists(item.FilePath))
-            {
-                Process.Start("explorer.exe", $"/select,\"{item.FilePath}\"");
-            }
+                Process.Start(new ProcessStartInfo(item.FilePath) { UseShellExecute = true });
         };
-        
+
+        var folderBtn = MakeShelfButton("Open folder");
+        folderBtn.Click += (s, e) =>
+        {
+            if (File.Exists(item.FilePath))
+                Process.Start("explorer.exe", $"/select,\"{item.FilePath}\"");
+        };
+
+        btnRow.Children.Add(openBtn);
+        btnRow.Children.Add(folderBtn);
+        outer.Children.Add(btnRow);
+
+        itemBorder.Child = outer;
         DownloadItems.Children.Add(itemBorder);
     }
-    
+
+    private static Button MakeShelfButton(string label) => new Button
+    {
+        Content = label,
+        FontSize = 11,
+        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!),
+        Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2a3a4a")!),
+        BorderThickness = new Thickness(0),
+        Padding = new Thickness(8, 3, 8, 3),
+        Margin = new Thickness(0, 0, 6, 0),
+        Cursor = System.Windows.Input.Cursors.Hand,
+        Template = CreateFlatButtonTemplate()
+    };
+
+    private static ControlTemplate CreateFlatButtonTemplate()
+    {
+        var tpl = new ControlTemplate(typeof(Button));
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+        border.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
+        var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+        cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(cp);
+        tpl.VisualTree = border;
+        return tpl;
+    }
+
     private void UpdateDownloadItem(DownloadItem item)
     {
-        // Update status in the shelf
         foreach (Border border in DownloadItems.Children.OfType<Border>())
         {
-            if (border.Tag?.ToString() == item.FilePath && border.Child is Grid grid)
+            if (border.Tag?.ToString() != item.FilePath) continue;
+            if (border.Child is not StackPanel outer) continue;
+
+            // Update status text
+            var topGrid = outer.Children.OfType<Grid>().FirstOrDefault();
+            var infoStack = topGrid?.Children.OfType<StackPanel>().FirstOrDefault();
+            var statusBlock = infoStack?.Children.OfType<TextBlock>().Skip(1).FirstOrDefault();
+            if (statusBlock != null)
+                statusBlock.Text = item.Status;
+
+            // Show action buttons when complete
+            if (item.State == "completed")
             {
-                var infoStack = grid.Children.OfType<StackPanel>().FirstOrDefault();
-                if (infoStack != null)
-                {
-                    var statusBlock = infoStack.Children.OfType<TextBlock>().Skip(1).FirstOrDefault();
-                    if (statusBlock != null)
-                    {
-                        statusBlock.Text = item.Status;
-                    }
-                }
+                var btnRow = outer.Children.OfType<StackPanel>()
+                                  .FirstOrDefault(p => p.Tag?.ToString() == "actionRow");
+                if (btnRow != null)
+                    btnRow.Visibility = Visibility.Visible;
             }
         }
     }
