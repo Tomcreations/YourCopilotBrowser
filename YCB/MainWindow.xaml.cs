@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private string? _attachedImagePath;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private WindowState _savedWindowState;
+    private CancellationTokenSource? _suggestCts;
     
     public MainWindow() : this(false, null) { }
 
@@ -2086,18 +2087,46 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Enter)
         {
-            Navigate(UrlBox.Text);
-            // Remove focus from URL box
-            if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
+            // If a suggestion is selected, navigate to it
+            if (SuggestPopup.IsOpen && SuggestionsList.SelectedItem is OmniSuggestion sel)
             {
-                _tabs[_activeTabIndex].WebView.Focus();
+                NavigateSuggestion(sel);
+                e.Handled = true;
+                return;
             }
+            Navigate(UrlBox.Text);
+            SuggestPopup.IsOpen = false;
+            if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
+                _tabs[_activeTabIndex].WebView.Focus();
+        }
+    }
+
+    private void UrlBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!SuggestPopup.IsOpen) return;
+        if (e.Key == Key.Down)
+        {
+            var count = SuggestionsList.Items.Count;
+            if (count == 0) return;
+            SuggestionsList.SelectedIndex = Math.Min((SuggestionsList.SelectedIndex + 1), count - 1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up)
+        {
+            SuggestionsList.SelectedIndex = Math.Max(SuggestionsList.SelectedIndex - 1, -1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            SuggestPopup.IsOpen = false;
+            e.Handled = true;
         }
     }
     
     private void UrlBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         UpdateUrlPlaceholder();
+        _ = UpdateSuggestionsAsync(UrlBox.Text);
     }
     
     private void UrlBox_GotFocus(object sender, RoutedEventArgs e)
@@ -2122,6 +2151,9 @@ public partial class MainWindow : Window
     {
         // Don't process lost focus when focus moved to BookmarkBtn — it causes star icon flicker
         if (BookmarkBtn.IsKeyboardFocused || BookmarkBtn.IsFocused) return;
+        // Don't close suggestions if focus moved into the suggestions list
+        if (SuggestionsList.IsKeyboardFocusWithin) return;
+        SuggestPopup.IsOpen = false;
 
         OmniboxBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#292b2f")!);
         
@@ -2132,6 +2164,106 @@ public partial class MainWindow : Window
             UrlBox.Text = GetDisplayUrl(actualUrl);
         }
         UpdateUrlPlaceholder();
+    }
+
+    private async Task UpdateSuggestionsAsync(string query)
+    {
+        _suggestCts?.Cancel();
+        _suggestCts = new CancellationTokenSource();
+        var cts = _suggestCts;
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            SuggestPopup.IsOpen = false;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(150, cts.Token);
+            if (cts.IsCancellationRequested) return;
+
+            var suggestions = new List<OmniSuggestion>();
+
+            // History matches (top 3, most recent first)
+            var history = LoadHistory();
+            var historyMatches = history
+                .Where(h => h.Url.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                             h.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(h => h.Timestamp)
+                .Take(3)
+                .Select(h => new OmniSuggestion
+                {
+                    Primary = h.Url,
+                    Secondary = h.Title,
+                    NavigateUrl = h.Url,
+                    IsHistory = true
+                });
+            suggestions.AddRange(historyMatches);
+
+            // Google search suggestions (up to 5)
+            try
+            {
+                using var http = new System.Net.Http.HttpClient();
+                http.Timeout = TimeSpan.FromSeconds(3);
+                var encoded = Uri.EscapeDataString(query);
+                var json = await http.GetStringAsync(
+                    $"https://suggestqueries.google.com/complete/search?client=firefox&q={encoded}", cts.Token);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                foreach (var s in doc.RootElement[1].EnumerateArray().Take(5))
+                {
+                    var text = s.GetString() ?? "";
+                    if (string.IsNullOrEmpty(text)) continue;
+                    suggestions.Add(new OmniSuggestion
+                    {
+                        Primary = text,
+                        NavigateUrl = $"https://www.google.com/search?q={Uri.EscapeDataString(text)}",
+                        IsHistory = false
+                    });
+                }
+            }
+            catch { /* ignore network failures */ }
+
+            if (cts.IsCancellationRequested) return;
+
+            SuggestionsList.ItemsSource = suggestions;
+            SuggestionsList.SelectedIndex = -1;
+            SuggestPopup.IsOpen = suggestions.Count > 0;
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void NavigateSuggestion(OmniSuggestion s)
+    {
+        SuggestPopup.IsOpen = false;
+        Navigate(s.NavigateUrl);
+        if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
+            _tabs[_activeTabIndex].WebView.Focus();
+    }
+
+    private void SuggestionsList_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is FrameworkElement fe &&
+            fe.DataContext is OmniSuggestion s)
+        {
+            NavigateSuggestion(s);
+            e.Handled = true;
+        }
+    }
+
+    private void SuggestionsList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && SuggestionsList.SelectedItem is OmniSuggestion s)
+        {
+            NavigateSuggestion(s);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            SuggestPopup.IsOpen = false;
+            UrlBox.Focus();
+            e.Handled = true;
+        }
     }
 
     private void BookmarkBtn_Click(object sender, RoutedEventArgs e)
@@ -3797,4 +3929,22 @@ public class ChatMessage
 {
     public string Role { get; set; } = "";
     public string Content { get; set; } = "";
+}
+
+public class OmniSuggestion
+{
+    public string Primary { get; set; } = "";
+    public string Secondary { get; set; } = "";
+    public string NavigateUrl { get; set; } = "";
+    public bool IsHistory { get; set; }
+
+    // Search magnifier icon
+    private const string SearchPath = "M10.5 10.5 L14 14 M9 15 C12.3137 15 15 12.3137 15 9 C15 5.68629 12.3137 3 9 3 C5.68629 3 3 5.68629 3 9 C3 12.3137 5.68629 15 9 15 Z";
+    // Clock/history icon
+    private const string HistoryPath = "M8 2 C4.686 2 2 4.686 2 8 C2 11.314 4.686 14 8 14 C11.314 14 14 11.314 14 8 C14 4.686 11.314 2 8 2 Z M8 5 L8 8.5 L11 10";
+
+    public string IconPath => IsHistory ? HistoryPath : SearchPath;
+    public string IconColor => IsHistory ? "#8ab4f8" : "#9aa0a6";
+    public System.Windows.Visibility SecondaryVisibility =>
+        string.IsNullOrEmpty(Secondary) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 }

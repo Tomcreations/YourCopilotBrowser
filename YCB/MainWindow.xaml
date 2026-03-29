@@ -139,7 +139,7 @@
                                  Background="Transparent" Foreground="#e8eaed" CaretBrush="#8ab4f8"
                                  BorderThickness="0" VerticalContentAlignment="Center"
                                  FontSize="13" FontFamily="Segoe UI" Padding="0"
-                                 KeyDown="UrlBox_KeyDown" GotFocus="UrlBox_GotFocus" LostFocus="UrlBox_LostFocus" TextChanged="UrlBox_TextChanged"/>
+                                 KeyDown="UrlBox_KeyDown" PreviewKeyDown="UrlBox_PreviewKeyDown" GotFocus="UrlBox_GotFocus" LostFocus="UrlBox_LostFocus" TextChanged="UrlBox_TextChanged"/>
                         <!-- Placeholder text for URL bar -->
                         <TextBlock x:Name="UrlPlaceholder"
                                    Text="Search with Google"
@@ -512,6 +512,78 @@
                         <TextBlock Text="Support"/>
                     </Button>
                 </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- OMNIBAR SUGGESTIONS POPUP -->
+        <Popup x:Name="SuggestPopup" StaysOpen="True" Placement="Bottom"
+               PlacementTarget="{Binding ElementName=OmniboxBorder}"
+               AllowsTransparency="True" VerticalOffset="4"
+               Width="{Binding ActualWidth, ElementName=OmniboxBorder}">
+            <Border Background="#2d2e31" CornerRadius="0,0,8,8" Padding="0,4">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" Opacity="0.55" ShadowDepth="5" Color="#000000"/>
+                </Border.Effect>
+                <ListBox x:Name="SuggestionsList"
+                         Background="Transparent" BorderThickness="0"
+                         MaxHeight="320"
+                         FocusVisualStyle="{x:Null}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         PreviewMouseLeftButtonDown="SuggestionsList_MouseDown"
+                         KeyDown="SuggestionsList_KeyDown"
+                         SelectionMode="Single">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="#e8eaed"/>
+                            <Setter Property="Padding" Value="12,7"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#3c4043"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#3c4043"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Viewbox Grid.Column="0" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="16" Height="16">
+                                        <Path Data="{Binding IconPath}" Stroke="{Binding IconColor}" Fill="Transparent"
+                                              StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <StackPanel Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Primary}" FontSize="13" Foreground="#e8eaed" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Secondary}" FontSize="11" Foreground="#9aa0a6" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding SecondaryVisibility}"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </Border>
         </Popup>
     </Grid>
