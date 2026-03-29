@@ -346,8 +346,25 @@ public partial class MainWindow : Window
         _isDarkMode = _settings.DarkMode;
         _searchEngine = _settings.SearchEngine ?? "google";
         ErrorReporter.IsEnabled = _settings.TelemetryEnabled;
+        UpdateImageButtonVisibility();
     }
     
+    private void UpdateImageButtonVisibility()
+    {
+        var model = _settings.YcbModel ?? "gpt-5-mini";
+        var supportsImages = model != "gpt-4.1";
+        if (ImageAttachBtn != null)
+        {
+            ImageAttachBtn.Visibility = supportsImages ? Visibility.Visible : Visibility.Collapsed;
+            // If image was attached and we switched to no-image model, clear it
+            if (!supportsImages && _attachedImagePath != null)
+            {
+                _attachedImagePath = null;
+                ImageAttachIndicator.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
     private void SaveSettings()
     {
         try
@@ -1131,7 +1148,7 @@ public partial class MainWindow : Window
                             bookmarks_bar = _settings.BookmarksBarVisible ? "on" : "off",
                             search_engine = _settings.SearchEngine ?? "google",
                             startup_mode = _settings.StartupMode ?? "newtab",
-                            ycb_model = _settings.YcbModel ?? "gpt-4.1",
+                            ycb_model = _settings.YcbModel ?? "gpt-5-mini",
                             incognito_ai_enabled = (_settings.IncognitoAIEnabled ?? false).ToString().ToLower(),
                             browser_theme = _settings.DarkMode ? "dark" : "light",
                             telemetry_enabled = _settings.TelemetryEnabled.ToString().ToLower(),
@@ -2445,7 +2462,7 @@ public partial class MainWindow : Window
                 var si = new ProcessStartInfo
                 {
                     FileName = copilotExe,
-                    Arguments = $"-p \"{imagePrompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on --allow-all-paths",
+                    Arguments = $"-p \"{imagePrompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-5-mini"} -s --no-ask-user --stream on --allow-all-paths",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -2512,7 +2529,7 @@ public partial class MainWindow : Window
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
-                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
+                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-5-mini"} -s --no-ask-user --stream on",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -3630,6 +3647,7 @@ public partial class MainWindow : Window
             case "ycb_model":
                 _settings.YcbModel = value;
                 SaveSettings();
+                UpdateImageButtonVisibility();
                 break;
 
             case "telemetry_enabled":
@@ -3719,7 +3737,7 @@ public class Settings
     public string SearchEngine { get; set; } = "google";
     public string FontSize { get; set; } = "medium";
     public string StartupMode { get; set; } = "newtab";
-    public string YcbModel { get; set; } = "gpt-4.1";
+    public string YcbModel { get; set; } = "gpt-5-mini";
     public bool HasSeenGuide { get; set; } = false;
     public bool TelemetryEnabled { get; set; } = true;
 }
