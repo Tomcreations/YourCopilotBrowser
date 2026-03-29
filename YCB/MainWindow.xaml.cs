@@ -2418,13 +2418,11 @@ public partial class MainWindow : Window
         if (imagePath != null)
         {
             var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
-            // Skip chat history for image requests — clean context only
-            prompt = $"You are a helpful browser assistant built into YCB.\n{imagePath}\n{userText}";
+            await SendImageToVision(imagePath, userText);
+            return;
         }
-        else
-        {
-            prompt += $"User: {message}";
-        }
+        
+        prompt += $"User: {message}";
         
         // Create response message placeholder
         var responseBorder = new Border
@@ -2451,11 +2449,10 @@ public partial class MainWindow : Window
         // Start copilot process
         try
         {
-            var extraArgs = imagePath != null ? "--allow-all-paths " : "";
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
-                Arguments = $"{extraArgs}-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
+                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -2531,6 +2528,107 @@ public partial class MainWindow : Window
             _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
             CopilotInput.IsEnabled = true;
         }
+    }
+
+    private async Task SendImageToVision(string imagePath, string userMessage)
+    {
+        // Show placeholder
+        var responseBorder = new Border
+        {
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#24263a")!),
+            CornerRadius = new CornerRadius(14, 14, 14, 3),
+            Padding = new Thickness(13, 10, 13, 10),
+            Margin = new Thickness(0, 5, 40, 5),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MaxWidth = 280
+        };
+        _currentResponseBlock = new TextBlock
+        {
+            Text = "Analysing image...",
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!),
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 13
+        };
+        responseBorder.Child = _currentResponseBlock;
+        MessagesPanel.Children.Add(responseBorder);
+        CopilotMessages.ScrollToEnd();
+
+        try
+        {
+            // Get GitHub token via gh CLI (same login used by Copilot)
+            var tokenProc = new Process { StartInfo = new ProcessStartInfo
+            {
+                FileName = "gh", Arguments = "auth token",
+                UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true
+            }};
+            tokenProc.Start();
+            var token = (await tokenProc.StandardOutput.ReadToEndAsync()).Trim();
+            tokenProc.WaitForExit(3000);
+
+            if (string.IsNullOrEmpty(token))
+            {
+                _currentResponseBlock.Text = "Not logged in to GitHub. Run 'gh auth login' and try again.";
+                _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
+                CopilotInput.IsEnabled = true;
+                return;
+            }
+
+            // Base64-encode the image
+            var bytes = await File.ReadAllBytesAsync(imagePath);
+            var b64 = Convert.ToBase64String(bytes);
+            var mime = IoPath.GetExtension(imagePath).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".gif"  => "image/gif",
+                ".webp" => "image/webp",
+                _       => "image/png"
+            };
+
+            // Build JSON request
+            var body = JsonSerializer.Serialize(new
+            {
+                model = "gpt-4o",
+                messages = new object[]
+                {
+                    new { role = "system", content = "You are a helpful browser assistant built into YCB." },
+                    new { role = "user", content = new object[]
+                        {
+                            new { type = "image_url", image_url = new { url = $"data:{mime};base64,{b64}" } },
+                            new { type = "text", text = userMessage }
+                        }
+                    }
+                }
+            });
+
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var resp = await http.PostAsync(
+                "https://models.inference.ai.azure.com/chat/completions",
+                new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            var json = await resp.Content.ReadAsStringAsync();
+
+            string reply;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                reply = doc.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString() ?? "No response.";
+            }
+            catch { reply = $"Error {(int)resp.StatusCode}: {json}"; }
+
+            _currentResponseBlock.Text = reply;
+            _chatHistory.Add(new ChatMessage { Role = "assistant", Content = reply });
+        }
+        catch (Exception ex)
+        {
+            _currentResponseBlock.Text = $"Vision error: {ex.Message}";
+            _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
+        }
+        finally { CopilotInput.IsEnabled = true; }
     }
 
     private string? FindCopilotExe()
