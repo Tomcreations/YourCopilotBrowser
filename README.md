@@ -68,8 +68,13 @@ Early on we had a bug where YCB worked perfectly on one machine but crashed on s
 
 You can turn this off at any time in **Settings > Data & Privacy**.
 
-## Support & Your User ID
+## Support & Bug Reports
 
-Every install of YCB has a unique **User ID** which you can find in **Settings > About**. This ID is anonymous and is only used to match your error logs if you contact support.
+If you're having an issue, the best way to get help is through our Discord:
 
-If you are having an issue, open **Settings > About**, copy your User ID, and include it when reaching out to support. With it we can look up your specific error logs and tell you whether the problem is on your end or ours — and how to fix it either way.
+1. Join the server: **[discord.gg/aAdbexZVVN](https://discord.gg/aAdbexZVVN)**
+2. Go to the **#support** channel and create a ticket
+3. Describe the issue in the ticket form
+4. When asked for your **User ID**, open YCB Browser, go to **Settings > About**, copy your User ID and paste it in
+
+Your User ID is anonymous and only used to look up your error logs so we can diagnose the problem quickly.
