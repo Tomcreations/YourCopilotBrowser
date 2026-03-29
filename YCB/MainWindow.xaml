@@ -328,11 +328,49 @@
                             <!-- Input row -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>  <!-- Image button LEFT -->
+                                    <ColumnDefinition Width="*"/>     <!-- Text input -->
+                                    <ColumnDefinition Width="Auto"/>  <!-- Send button -->
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Background="#2a2b36" CornerRadius="20"
+
+                                <!-- Image button + popup -->
+                                <Grid Grid.Column="0" Margin="0,0,8,0">
+                                    <Button x:Name="ImageAttachBtn" Click="AttachImage_Click"
+                                            Style="{StaticResource IconBtnStyle}" ToolTip="Attach image">
+                                        <Canvas Width="16" Height="16">
+                                            <Path Data="M1 5 L1 14 L15 14 L15 5 L11 5 L10 3 L6 3 L5 5 Z"
+                                                  Stroke="#9aa0a6" StrokeThickness="1.2" Fill="Transparent"
+                                                  StrokeLineJoin="Round"/>
+                                            <Ellipse Canvas.Left="5" Canvas.Top="7" Width="6" Height="6"
+                                                     Stroke="#9aa0a6" StrokeThickness="1.2" Fill="Transparent"/>
+                                        </Canvas>
+                                    </Button>
+                                    <Popup x:Name="ImagePickerPopup"
+                                           PlacementTarget="{Binding ElementName=ImageAttachBtn}"
+                                           Placement="Top" StaysOpen="False" VerticalOffset="-4">
+                                        <Border Background="#2a2b36" CornerRadius="8"
+                                                BorderBrush="#3d3e4a" BorderThickness="1" Padding="4">
+                                            <StackPanel>
+                                                <Button Click="TakeScreenshot_Click" Style="{StaticResource LinkBtnStyle}"
+                                                        HorizontalContentAlignment="Left" Padding="10,7">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="📸" FontSize="13" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="Screenshot" Foreground="#e8eaed" FontSize="13"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Click="OpenGallery_Click" Style="{StaticResource LinkBtnStyle}"
+                                                        HorizontalContentAlignment="Left" Padding="10,7">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="🖼" FontSize="13" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="Gallery" Foreground="#e8eaed" FontSize="13"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+
+                                <Border Grid.Column="1" Background="#2a2b36" CornerRadius="20"
                                         BorderBrush="#3d3e4a" BorderThickness="1">
                                     <TextBox x:Name="CopilotInput"
                                              Background="Transparent" Foreground="#e8eaed" CaretBrush="#8ab4f8"
@@ -340,19 +378,8 @@
                                              VerticalContentAlignment="Center"
                                              KeyDown="CopilotInput_KeyDown"/>
                                 </Border>
-                                <!-- Image attach button -->
-                                <Button Grid.Column="1" Click="AttachImage_Click"
-                                        Style="{StaticResource IconBtnStyle}" Margin="8,0,0,0" ToolTip="Attach image">
-                                    <Canvas Width="16" Height="16">
-                                        <Path Data="M1 5 L1 14 L15 14 L15 5 L11 5 L10 3 L6 3 L5 5 Z"
-                                              Stroke="#9aa0a6" StrokeThickness="1.2" Fill="Transparent"
-                                              StrokeLineJoin="Round"/>
-                                        <Ellipse Canvas.Left="5" Canvas.Top="7" Width="6" Height="6"
-                                                 Stroke="#9aa0a6" StrokeThickness="1.2" Fill="Transparent"/>
-                                    </Canvas>
-                                </Button>
                                 <Button Grid.Column="2" Click="SendCopilot_Click"
-                                        Style="{StaticResource SendBtnStyle}" Margin="4,0,0,0">
+                                        Style="{StaticResource SendBtnStyle}" Margin="8,0,0,0">
                                     <Path Data="M1 8 L14 2 L9 8 L14 14 Z" Fill="#111"
                                           Width="16" Height="16" Stretch="Uniform"/>
                                 </Button>

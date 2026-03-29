@@ -48,6 +48,8 @@ public partial class MainWindow : Window
     private CoreWebView2Environment? _webViewEnvironment;
     private CoreWebView2Environment? _incognitoWebViewEnvironment;
     private string? _attachedImagePath;
+    private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
+    private WindowState _savedWindowState;
     
     public MainWindow() : this(false, null) { }
 
@@ -305,19 +307,39 @@ public partial class MainWindow : Window
 
         if (_isFullscreen)
         {
+            _savedLeft = Left; _savedTop = Top;
+            _savedWidth = Width; _savedHeight = Height;
+            _savedWindowState = WindowState;
+
             TabStrip.Visibility = Visibility.Collapsed;
             Toolbar.Visibility  = Visibility.Collapsed;
             MainGrid.RowDefinitions[0].Height = new GridLength(0);
             MainGrid.RowDefinitions[1].Height = new GridLength(0);
-            ShowWindow(hwnd, SW_MAXIMIZE);
+
+            var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfo(monitor, ref info);
+            var dpi = VisualTreeHelper.GetDpi(this);
+
+            WindowState = WindowState.Normal;
+            Left   = info.rcMonitor.Left   / dpi.DpiScaleX;
+            Top    = info.rcMonitor.Top    / dpi.DpiScaleY;
+            Width  = info.rcMonitor.Width  / dpi.DpiScaleX;
+            Height = info.rcMonitor.Height / dpi.DpiScaleY;
         }
         else
         {
-            ShowWindow(hwnd, SW_RESTORE);
             TabStrip.Visibility = Visibility.Visible;
             Toolbar.Visibility  = Visibility.Visible;
             MainGrid.RowDefinitions[0].Height = new GridLength(36);
             MainGrid.RowDefinitions[1].Height = new GridLength(46);
+
+            WindowState = _savedWindowState;
+            if (_savedWindowState == WindowState.Normal)
+            {
+                Left = _savedLeft; Top = _savedTop;
+                Width = _savedWidth; Height = _savedHeight;
+            }
         }
     }
     
@@ -1512,19 +1534,6 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_GETMINMAXINFO && _isFullscreen)
-        {
-            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
-            var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            GetMonitorInfo(monitor, ref info);
-            mmi.ptMaxPosition.x = 0;
-            mmi.ptMaxPosition.y = 0;
-            mmi.ptMaxSize.x = info.rcMonitor.Width;
-            mmi.ptMaxSize.y = info.rcMonitor.Height;
-            Marshal.StructureToPtr(mmi, lParam, true);
-            handled = true;
-        }
         return IntPtr.Zero;
     }
 
@@ -2177,6 +2186,30 @@ public partial class MainWindow : Window
     
     private void AttachImage_Click(object sender, RoutedEventArgs e)
     {
+        ImagePickerPopup.IsOpen = !ImagePickerPopup.IsOpen;
+    }
+
+    private async void TakeScreenshot_Click(object sender, RoutedEventArgs e)
+    {
+        ImagePickerPopup.IsOpen = false;
+        if (_activeTabIndex < 0 || _activeTabIndex >= _tabs.Count) return;
+        var webView = _tabs[_activeTabIndex].WebView;
+        if (webView?.CoreWebView2 == null) return;
+
+        var path = IoPath.Combine(IoPath.GetTempPath(), $"ycb_screenshot_{DateTime.Now:yyyyMMddHHmmss}.png");
+        using (var stream = new FileStream(path, FileMode.Create))
+        {
+            await webView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream);
+        }
+
+        _attachedImagePath = path;
+        ImageAttachName.Text = "📸 Screenshot";
+        ImageAttachIndicator.Visibility = Visibility.Visible;
+    }
+
+    private void OpenGallery_Click(object sender, RoutedEventArgs e)
+    {
+        ImagePickerPopup.IsOpen = false;
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
             Title = "Select an image",
@@ -2185,7 +2218,7 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() == true)
         {
             _attachedImagePath = dlg.FileName;
-            ImageAttachName.Text = "📎 " + System.IO.Path.GetFileName(dlg.FileName);
+            ImageAttachName.Text = "📎 " + IoPath.GetFileName(dlg.FileName);
             ImageAttachIndicator.Visibility = Visibility.Visible;
         }
     }
