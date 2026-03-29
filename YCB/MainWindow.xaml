@@ -140,7 +140,7 @@
                                  Background="Transparent" Foreground="#e8eaed" CaretBrush="#8ab4f8"
                                  BorderThickness="0" VerticalContentAlignment="Center"
                                  FontSize="13" FontFamily="Segoe UI" Padding="0"
-                                 KeyDown="UrlBox_KeyDown" PreviewKeyDown="UrlBox_PreviewKeyDown" GotFocus="UrlBox_GotFocus" LostFocus="UrlBox_LostFocus" TextChanged="UrlBox_TextChanged"/>
+                                 KeyDown="UrlBox_KeyDown" PreviewKeyDown="UrlBox_PreviewKeyDown" PreviewTextInput="UrlBox_PreviewTextInput" GotFocus="UrlBox_GotFocus" LostFocus="UrlBox_LostFocus" TextChanged="UrlBox_TextChanged"/>
                         <!-- Placeholder text for URL bar -->
                         <TextBlock x:Name="UrlPlaceholder"
                                    Text="Search with Google"

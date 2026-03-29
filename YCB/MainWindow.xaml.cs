@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private WindowState _savedWindowState;
     private CancellationTokenSource? _suggestCts;
+    private bool _userEditingUrl = false;
     
     public MainWindow() : this(false, null) { }
 
@@ -2113,6 +2114,10 @@ public partial class MainWindow : Window
 
     private void UrlBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Mark user as actively editing for keys that modify text
+        if (e.Key == Key.Back || e.Key == Key.Delete)
+            _userEditingUrl = true;
+
         if (!SuggestPopup.IsOpen) return;
         if (e.Key == Key.Down)
         {
@@ -2133,6 +2138,11 @@ public partial class MainWindow : Window
         }
     }
     
+    private void UrlBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        _userEditingUrl = true;
+    }
+
     private void UrlBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         UpdateUrlPlaceholder();
@@ -2156,7 +2166,7 @@ public partial class MainWindow : Window
                 UrlBox.TextDecorations = null;
             }
         }
-        if (!string.IsNullOrWhiteSpace(text))
+        if (!string.IsNullOrWhiteSpace(text) && _userEditingUrl)
             _ = UpdateSuggestionsAsync(text);
         else
             SuggestPopup.IsOpen = false;
@@ -2164,6 +2174,7 @@ public partial class MainWindow : Window
     
     private void UrlBox_GotFocus(object sender, RoutedEventArgs e)
     {
+        _userEditingUrl = false;
         OmniboxBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3c4043")!);
         UrlPlaceholder.Visibility = Visibility.Collapsed;
         // Reset URL styling so editing starts clean
@@ -2185,6 +2196,7 @@ public partial class MainWindow : Window
     
     private void UrlBox_LostFocus(object sender, RoutedEventArgs e)
     {
+        _userEditingUrl = false;
         // Don't process lost focus when focus moved to BookmarkBtn — it causes star icon flicker
         if (BookmarkBtn.IsKeyboardFocused || BookmarkBtn.IsFocused) return;
         // Don't close suggestions if focus moved into the suggestions list
