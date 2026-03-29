@@ -508,6 +508,12 @@
                     <Button Click="MenuGuide_Click" Style="{StaticResource MenuItemStyle}">
                         <TextBlock Text="Help &amp; Guide"/>
                     </Button>
+                    <Button Click="MenuSupport_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Support"/>
+                    </Button>
+                    <Button Click="MenuSupport_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Support"/>
+                    </Button>
                 </StackPanel>
             </Border>
         </Popup>

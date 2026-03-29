@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         LoadSettings();
         
         Loaded += MainWindow_Loaded;
+        LocationChanged += (_, _) => { if (!_isFullscreen && Top < 0) Top = 0; };
         StateChanged += MainWindow_StateChanged;
         KeyDown += MainWindow_KeyDown;
         SizeChanged += (_, _) => UpdateTabWidths();
@@ -303,12 +304,9 @@ public partial class MainWindow : Window
     private void ToggleFullscreen()
     {
         _isFullscreen = !_isFullscreen;
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
         if (_isFullscreen)
         {
-            _savedLeft = Left; _savedTop = Top;
-            _savedWidth = Width; _savedHeight = Height;
             _savedWindowState = WindowState;
 
             TabStrip.Visibility = Visibility.Collapsed;
@@ -316,16 +314,9 @@ public partial class MainWindow : Window
             MainGrid.RowDefinitions[0].Height = new GridLength(0);
             MainGrid.RowDefinitions[1].Height = new GridLength(0);
 
-            var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            GetMonitorInfo(monitor, ref info);
-            var dpi = VisualTreeHelper.GetDpi(this);
-
-            WindowState = WindowState.Normal;
-            Left   = info.rcMonitor.Left   / dpi.DpiScaleX;
-            Top    = info.rcMonitor.Top    / dpi.DpiScaleY;
-            Width  = info.rcMonitor.Width  / dpi.DpiScaleX;
-            Height = info.rcMonitor.Height / dpi.DpiScaleY;
+            // WM_GETMINMAXINFO will constrain Maximized to full monitor (no taskbar gap, no overflow)
+            if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+            WindowState = WindowState.Maximized;
         }
         else
         {
@@ -334,12 +325,9 @@ public partial class MainWindow : Window
             MainGrid.RowDefinitions[0].Height = new GridLength(36);
             MainGrid.RowDefinitions[1].Height = new GridLength(46);
 
-            WindowState = _savedWindowState;
-            if (_savedWindowState == WindowState.Normal)
-            {
-                Left = _savedLeft; Top = _savedTop;
-                Width = _savedWidth; Height = _savedHeight;
-            }
+            WindowState = WindowState.Normal;
+            if (_savedWindowState == WindowState.Maximized)
+                WindowState = WindowState.Maximized;
         }
     }
     
@@ -1027,6 +1015,9 @@ public partial class MainWindow : Window
             case "history":
                 htmlFile = IoPath.Combine(rendererPath, "history.html");
                 break;
+            case "support":
+                htmlFile = IoPath.Combine(rendererPath, "support.html");
+                break;
             case "downloads":
                 htmlFile = IoPath.Combine(rendererPath, "downloads.html");
                 break;
@@ -1382,7 +1373,11 @@ public partial class MainWindow : Window
                         var url = urlElement.GetString();
                         if (!string.IsNullOrEmpty(url))
                         {
-                            await CreateTab(url);
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
+                                    _tabs[_activeTabIndex].WebView?.CoreWebView2?.Navigate(url);
+                            });
                         }
                     }
                     break;
@@ -1413,6 +1408,36 @@ public partial class MainWindow : Window
                     ClearDownloads();
                     break;
                     
+                case "support:getUserId":
+                    if (sender is CoreWebView2 ugvw)
+                    {
+                        var uid = JsonSerializer.Serialize(ErrorReporter.UserId ?? "unknown");
+                        await ugvw.ExecuteScriptAsync($"window.setUserId && window.setUserId({uid})");
+                    }
+                    break;
+
+                case "support:submit":
+                    if (sender is CoreWebView2 svw)
+                    {
+                        var subject = message.TryGetValue("subject", out var sj) ? sj.GetString() ?? "" : "";
+                        var body    = message.TryGetValue("body",    out var bd) ? bd.GetString() ?? "" : "";
+                        var userId  = ErrorReporter.UserId ?? "unknown";
+                        try
+                        {
+                            using var http = new System.Net.Http.HttpClient();
+                            var payload = JsonSerializer.Serialize(new { userId, subject, body });
+                            var content = new System.Net.Http.StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+                            var resp = await http.PostAsync("https://ycb.tomcreations.org/Support/Ticket/", content);
+                            var ok = resp.IsSuccessStatusCode;
+                            await svw.ExecuteScriptAsync($"window.onSubmitResult && window.onSubmitResult({(ok ? "true" : "false")})");
+                        }
+                        catch
+                        {
+                            await svw.ExecuteScriptAsync("window.onSubmitResult && window.onSubmitResult(false)");
+                        }
+                    }
+                    break;
+
                 case "settings:getUserId":
                     if (sender is CoreWebView2 swv)
                     {
@@ -1519,12 +1544,14 @@ public partial class MainWindow : Window
     {
         public POINT ptReserved, ptMaxSize, ptMaxPosition, ptMinTrackSize, ptMaxTrackSize;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MONITORINFO
     {
         public int cbSize;
-        public System.Drawing.Rectangle rcMonitor;
-        public System.Drawing.Rectangle rcWork;
+        public RECT rcMonitor;
+        public RECT rcWork;
         public uint dwFlags;
     }
     private const int WM_GETMINMAXINFO   = 0x0024;
@@ -1534,6 +1561,21 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == WM_GETMINMAXINFO && _isFullscreen)
+        {
+            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+            var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfo(monitor, ref info);
+            mmi.ptMaxPosition.x = info.rcMonitor.Left - info.rcMonitor.Left;
+            mmi.ptMaxPosition.y = info.rcMonitor.Top  - info.rcMonitor.Top;
+            mmi.ptMaxSize.x     = info.rcMonitor.Right  - info.rcMonitor.Left;
+            mmi.ptMaxSize.y     = info.rcMonitor.Bottom - info.rcMonitor.Top;
+            mmi.ptMaxTrackSize.x = mmi.ptMaxSize.x;
+            mmi.ptMaxTrackSize.y = mmi.ptMaxSize.y;
+            Marshal.StructureToPtr(mmi, lParam, true);
+            handled = true;
+        }
         return IntPtr.Zero;
     }
 
@@ -2541,6 +2583,12 @@ public partial class MainWindow : Window
         await CreateTab("ycb://passwords");
     }
     
+    private void MenuSupport_Click(object sender, RoutedEventArgs e)
+    {
+        MenuPopup.IsOpen = false;
+        _ = CreateTab("ycb://support");
+    }
+
     private async void MenuGuide_Click(object sender, RoutedEventArgs e)
     {
         MenuPopup.IsOpen = false;

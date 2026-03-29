@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Support – YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #202124; color: #e8eaed;
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 14px; min-height: 100vh;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: #292a2d; border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 18px 32px 14px;
+    }
+    header h1 { font-size: 22px; font-weight: 400; }
+    #content { max-width: 640px; margin: 0 auto; padding: 32px 16px 60px; }
+    .desc { color: #9aa0a6; font-size: 13px; margin-bottom: 28px; line-height: 1.6; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #9aa0a6; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    input[type=text], textarea {
+      width: 100%; background: #2a2b36; border: 1px solid #3d3e4a;
+      border-radius: 8px; padding: 10px 14px; color: #e8eaed;
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type=text]:focus, textarea:focus { border-color: #8ab4f8; }
+    textarea { resize: vertical; min-height: 140px; }
+    .user-id-row {
+      display: flex; align-items: center; gap: 10px;
+      background: #2a2b36; border: 1px solid #3d3e4a;
+      border-radius: 8px; padding: 10px 14px;
+    }
+    .user-id-val { flex: 1; color: #8ab4f8; font-size: 13px; font-family: monospace; }
+    .btn-submit {
+      background: #8ab4f8; color: #111; border: none;
+      border-radius: 8px; padding: 11px 28px; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-submit:hover { opacity: 0.85; }
+    .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    #status { margin-top: 16px; font-size: 13px; min-height: 20px; }
+    .ok  { color: #81c995; }
+    .err { color: #f28b82; }
+  </style>
+</head>
+<body>
+  <header><h1>Support</h1></header>
+  <div id="content">
+    <p class="desc">Having an issue? Fill out the form below and we'll look into it. Include as much detail as possible — your User ID is attached automatically so we can look up your error logs.</p>
+
+    <div class="field">
+      <label>Your User ID</label>
+      <div class="user-id-row">
+        <span class="user-id-val" id="uid">Loading…</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Subject</label>
+      <input type="text" id="subject" placeholder="Brief description of the issue">
+    </div>
+
+    <div class="field">
+      <label>Message</label>
+      <textarea id="body" placeholder="Describe what happened, steps to reproduce, and anything else that might help…"></textarea>
+    </div>
+
+    <button class="btn-submit" id="btn-submit">Send Ticket</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const api = {
+      postMessage: (type, data) => {
+        if (window.chrome && window.chrome.webview)
+          window.chrome.webview.postMessage({ type, ...data });
+      }
+    };
+
+    // Load user ID
+    api.postMessage('settings:getUserId');
+
+    // Intercept the getUserId script injection to also set uid field
+    const _origExec = window.__ycbUserId__;
+    window.addEventListener('message', () => {});
+
+    // C# injects the user ID via ExecuteScript into the about-user-id element
+    // We also need it here — request it via a known pattern
+    // Watch for the element or use MutationObserver trick
+    const observer = new MutationObserver(() => {
+      const el = document.getElementById('about-user-id');
+      if (el && el.textContent) {
+        document.getElementById('uid').textContent = el.textContent;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Also set via direct WebMessage from C# side using support:getUserId
+    api.postMessage('support:getUserId');
+
+    window.setUserId = function(id) {
+      document.getElementById('uid').textContent = id;
+    };
+
+    document.getElementById('btn-submit').addEventListener('click', () => {
+      const subject = document.getElementById('subject').value.trim();
+      const body    = document.getElementById('body').value.trim();
+      if (!subject || !body) {
+        setStatus('Please fill in both fields.', false);
+        return;
+      }
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      api.postMessage('support:submit', { subject, body });
+    });
+
+    window.onSubmitResult = function(ok) {
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = false;
+      btn.textContent = 'Send Ticket';
+      if (ok) {
+        setStatus('✓ Ticket sent! We\'ll get back to you.', true);
+        document.getElementById('subject').value = '';
+        document.getElementById('body').value = '';
+      } else {
+        setStatus('✗ Failed to send. Check your connection and try again.', false);
+      }
+    };
+
+    function setStatus(msg, ok) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = ok ? 'ok' : 'err';
+    }
+  </script>
+</body>
+</html>
