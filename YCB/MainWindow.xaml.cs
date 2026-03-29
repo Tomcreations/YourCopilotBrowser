@@ -2418,7 +2418,8 @@ public partial class MainWindow : Window
         if (imagePath != null)
         {
             var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
-            prompt += $"{imagePath}\n{userText}";
+            // Skip chat history for image requests — clean context only
+            prompt = $"You are a helpful browser assistant built into YCB.\n{imagePath}\n{userText}";
         }
         else
         {
@@ -2468,6 +2469,8 @@ public partial class MainWindow : Window
             {
                 if (args.Data != null)
                 {
+                    if (fullResponse.Length > 0)
+                        fullResponse.AppendLine();
                     fullResponse.Append(args.Data);
                     Dispatcher.Invoke(() =>
                     {
