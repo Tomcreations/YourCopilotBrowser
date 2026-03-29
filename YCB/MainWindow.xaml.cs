@@ -2290,7 +2290,13 @@ public partial class MainWindow : Window
         var model = (_settings.YcbModel ?? "gpt-5-mini").Trim().ToLowerInvariant();
         if (model == "gpt-4.1" || model.Contains("4.1"))
         {
-            // Show message in chat instead of MessageBox
+            // Open sidebar if hidden so user sees the message
+            if (!_copilotVisible)
+            {
+                _copilotVisible = true;
+                CopilotSidebar.Visibility = Visibility.Visible;
+                SidebarColumn.Width = new GridLength(340);
+            }
             AddCopilotMessage("Images are not supported on gpt-4.1. Switch to a different model in Settings to use image features.", false);
             return;
         }
