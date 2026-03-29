@@ -2417,12 +2417,13 @@ public partial class MainWindow : Window
         
         if (imagePath != null)
         {
-            // Image: send via GitHub Models vision API using existing gh auth
-            await SendCopilotWithImage(imagePath, message, prompt);
-            return;
+            var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
+            prompt += $"User: Look at this file: {imagePath}\n{userText}";
         }
-        
-        prompt += $"User: {message}";
+        else
+        {
+            prompt += $"User: {message}";
+        }
         
         // Create response message placeholder
         var responseBorder = new Border
@@ -2449,10 +2450,11 @@ public partial class MainWindow : Window
         // Start copilot process
         try
         {
+            var extraArgs = imagePath != null ? "--allow-all-paths " : "";
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
-                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
+                Arguments = $"{extraArgs}-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -2528,132 +2530,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task SendCopilotWithImage(string imagePath, string userMessage, string contextPrompt)
-    {
-        // Add response placeholder
-        var responseBorder = new Border
-        {
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#24263a")!),
-            CornerRadius = new CornerRadius(14, 14, 14, 3),
-            Padding = new Thickness(13, 10, 13, 10),
-            Margin = new Thickness(0, 5, 40, 5),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            MaxWidth = 280
-        };
-        _currentResponseBlock = new TextBlock
-        {
-            Text = "Looking at image...",
-            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!),
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 13
-        };
-        responseBorder.Child = _currentResponseBlock;
-        MessagesPanel.Children.Add(responseBorder);
-        CopilotMessages.ScrollToEnd();
-
-        try
-        {
-            // Get GitHub token from gh CLI
-            var tokenProc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "gh",
-                    Arguments = "auth token",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                }
-            };
-            tokenProc.Start();
-            var token = (await tokenProc.StandardOutput.ReadToEndAsync()).Trim();
-            tokenProc.WaitForExit(3000);
-
-            if (string.IsNullOrEmpty(token))
-            {
-                _currentResponseBlock.Text = "Could not get GitHub auth token. Make sure you're logged in with 'gh auth login'.";
-                _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
-                CopilotInput.IsEnabled = true;
-                return;
-            }
-
-            // Read and base64-encode the image
-            var imageBytes = await File.ReadAllBytesAsync(imagePath);
-            var base64 = Convert.ToBase64String(imageBytes);
-            var ext = IoPath.GetExtension(imagePath).ToLowerInvariant();
-            var mime = ext switch
-            {
-                ".png"  => "image/png",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".gif"  => "image/gif",
-                ".webp" => "image/webp",
-                _       => "image/png"
-            };
-
-            var userText = string.IsNullOrEmpty(userMessage) ? "Describe what you see in this image." : userMessage;
-
-            // Build request body for GitHub Models vision API
-            var requestBody = JsonSerializer.Serialize(new
-            {
-                model = _settings.YcbModel ?? "gpt-4o",
-                stream = false,
-                messages = new object[]
-                {
-                    new
-                    {
-                        role = "system",
-                        content = "You are a helpful browser assistant built into YCB. You can see and analyze images."
-                    },
-                    new
-                    {
-                        role = "user",
-                        content = new object[]
-                        {
-                            new { type = "image_url", image_url = new { url = $"data:{mime};base64,{base64}" } },
-                            new { type = "text", text = userText }
-                        }
-                    }
-                }
-            });
-
-            using var http = new System.Net.Http.HttpClient();
-            http.Timeout = TimeSpan.FromSeconds(60);
-            http.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            var content = new System.Net.Http.StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-
-            var resp = await http.PostAsync("https://models.inference.ai.azure.com/chat/completions", content);
-            var json = await resp.Content.ReadAsStringAsync();
-
-            string reply;
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                reply = doc.RootElement
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString() ?? "No response.";
-            }
-            catch
-            {
-                reply = resp.IsSuccessStatusCode ? json : $"Error {(int)resp.StatusCode}: {json}";
-            }
-
-            _currentResponseBlock.Text = reply;
-            _chatHistory.Add(new ChatMessage { Role = "assistant", Content = reply });
-        }
-        catch (Exception ex)
-        {
-            _currentResponseBlock.Text = $"Image error: {ex.Message}";
-            _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
-        }
-        finally
-        {
-            CopilotInput.IsEnabled = true;
-        }
-    }
-    
     private string? FindCopilotExe()
     {
         // Check common locations
