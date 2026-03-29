@@ -588,8 +588,11 @@ public partial class MainWindow : Window
             ShowPermissionDialog(webView, e);
         };
         
+        webView.GotFocus += (s, e) => SuggestPopup.IsOpen = false;
+
         webView.NavigationStarting += (s, e) =>
         {
+            SuggestPopup.IsOpen = false;
             _navStartTimes[webView] = DateTime.UtcNow;
             _autofillShownForTab.Remove(webView);
             var idx = GetTabIndexForWebView(webView);
@@ -2104,10 +2107,7 @@ public partial class MainWindow : Window
     private void Window_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!SuggestPopup.IsOpen) return;
-        // Close popup if click is outside the omnibox and suggestion popup
-        var clickedInOmni = OmniboxBorder.IsMouseOver;
-        var clickedInPopup = SuggestPopup.Child?.IsMouseOver == true;
-        if (!clickedInOmni && !clickedInPopup)
+        if (!OmniboxBorder.IsMouseOver)
             SuggestPopup.IsOpen = false;
     }
 
@@ -2136,22 +2136,25 @@ public partial class MainWindow : Window
     private void UrlBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         UpdateUrlPlaceholder();
-        // URL detection: has a dot, no spaces, or starts with http(s)://
         var text = UrlBox.Text;
-        var looksLikeUrl = !string.IsNullOrWhiteSpace(text) &&
-                           !text.Contains(' ') &&
-                           (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                            text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                            (text.Contains('.') && !text.StartsWith("ycb://")));
-        if (looksLikeUrl)
+        // Only style as URL when user is actively typing
+        if (UrlBox.IsFocused)
         {
-            UrlBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!);
-            UrlBox.TextDecorations = TextDecorations.Underline;
-        }
-        else
-        {
-            UrlBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!);
-            UrlBox.TextDecorations = null;
+            var looksLikeUrl = !string.IsNullOrWhiteSpace(text) &&
+                               !text.Contains(' ') &&
+                               (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                                text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                                (text.Contains('.') && !text.StartsWith("ycb://")));
+            if (looksLikeUrl)
+            {
+                UrlBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!);
+                UrlBox.TextDecorations = TextDecorations.Underline;
+            }
+            else
+            {
+                UrlBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!);
+                UrlBox.TextDecorations = null;
+            }
         }
         if (!string.IsNullOrWhiteSpace(text))
             _ = UpdateSuggestionsAsync(text);
@@ -2189,6 +2192,9 @@ public partial class MainWindow : Window
         SuggestPopup.IsOpen = false;
 
         OmniboxBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#292b2f")!);
+        // Clear URL typing style
+        UrlBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!);
+        UrlBox.TextDecorations = null;
         
         // Show display URL when losing focus
         if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
