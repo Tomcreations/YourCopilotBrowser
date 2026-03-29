@@ -2415,14 +2415,14 @@ public partial class MainWindow : Window
             prompt += "\n";
         }
         
-        prompt += $"User: {message}";
-        
-        // If image is attached, prepend a view instruction
         if (imagePath != null)
         {
-            prompt = $"[The user has attached an image. View this image: {imagePath}]\n\n" + prompt;
-            if (string.IsNullOrEmpty(message))
-                prompt += "User: (see attached image)";
+            var userText = string.IsNullOrEmpty(message) ? "What is in this image?" : message;
+            prompt += $"User: View this image and respond to the following: {userText}";
+        }
+        else
+        {
+            prompt += $"User: {message}";
         }
         
         // Create response message placeholder
@@ -2450,10 +2450,11 @@ public partial class MainWindow : Window
         // Start copilot process
         try
         {
+            var imageArg = imagePath != null ? $"--image \"{imagePath.Replace("\"", "\\\"")}\" " : "";
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
-                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
+                Arguments = $"{imageArg}-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
