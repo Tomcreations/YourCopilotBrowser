@@ -2287,9 +2287,11 @@ public partial class MainWindow : Window
     
     private void AttachImage_Click(object sender, RoutedEventArgs e)
     {
-        if ((_settings.YcbModel ?? "gpt-5-mini") == "gpt-4.1")
+        var model = (_settings.YcbModel ?? "gpt-5-mini").Trim().ToLowerInvariant();
+        if (model == "gpt-4.1" || model.Contains("4.1"))
         {
-            MessageBox.Show("Images are not supported on gpt-4.1.\n\nSwitch to a different model in Settings to use image features.", "Images Not Supported", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Show message in chat instead of MessageBox
+            AddCopilotMessage("Images are not supported on gpt-4.1. Switch to a different model in Settings to use image features.", false);
             return;
         }
         ImagePickerPopup.IsOpen = !ImagePickerPopup.IsOpen;
