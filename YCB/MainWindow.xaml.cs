@@ -346,25 +346,8 @@ public partial class MainWindow : Window
         _isDarkMode = _settings.DarkMode;
         _searchEngine = _settings.SearchEngine ?? "google";
         ErrorReporter.IsEnabled = _settings.TelemetryEnabled;
-        UpdateImageButtonVisibility();
     }
     
-    private void UpdateImageButtonVisibility()
-    {
-        var model = _settings.YcbModel ?? "gpt-5-mini";
-        var supportsImages = model != "gpt-4.1";
-        if (ImageAttachBtn != null)
-        {
-            ImageAttachBtn.Visibility = supportsImages ? Visibility.Visible : Visibility.Collapsed;
-            // If image was attached and we switched to no-image model, clear it
-            if (!supportsImages && _attachedImagePath != null)
-            {
-                _attachedImagePath = null;
-                ImageAttachIndicator.Visibility = Visibility.Collapsed;
-            }
-        }
-    }
-
     private void SaveSettings()
     {
         try
@@ -2304,6 +2287,11 @@ public partial class MainWindow : Window
     
     private void AttachImage_Click(object sender, RoutedEventArgs e)
     {
+        if ((_settings.YcbModel ?? "gpt-5-mini") == "gpt-4.1")
+        {
+            MessageBox.Show("Images are not supported on gpt-4.1.\n\nSwitch to a different model in Settings to use image features.", "Images Not Supported", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         ImagePickerPopup.IsOpen = !ImagePickerPopup.IsOpen;
     }
 
@@ -3647,7 +3635,6 @@ public partial class MainWindow : Window
             case "ycb_model":
                 _settings.YcbModel = value;
                 SaveSettings();
-                UpdateImageButtonVisibility();
                 break;
 
             case "telemetry_enabled":
