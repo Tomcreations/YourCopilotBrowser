@@ -2417,8 +2417,8 @@ public partial class MainWindow : Window
         
         if (imagePath != null)
         {
-            var userText = string.IsNullOrEmpty(message) ? "What is in this image?" : message;
-            prompt += $"User: View this image and respond to the following: {userText}";
+            var userText = string.IsNullOrEmpty(message) ? "Describe what you see in this image in detail." : message;
+            prompt += $"User: Read and view the image file at this exact path: {imagePath}\nThen answer the following based on what you see in the image: {userText}";
         }
         else
         {
@@ -2450,7 +2450,7 @@ public partial class MainWindow : Window
         // Start copilot process
         try
         {
-            var imageArg = imagePath != null ? $"--image \"{imagePath.Replace("\"", "\\\"")}\" " : "";
+            var imageArg = imagePath != null ? $"--allow-all-paths --allow-tool=read " : "";
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
