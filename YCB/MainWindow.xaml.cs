@@ -2418,7 +2418,67 @@ public partial class MainWindow : Window
         if (imagePath != null)
         {
             var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
-            await SendImageToVision(imagePath, userText);
+            var imagePrompt = $"{imagePath}\n{userText}";
+            
+            var responseBorder2 = new Border
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#24263a")!),
+                CornerRadius = new CornerRadius(14, 14, 14, 3),
+                Padding = new Thickness(13, 10, 13, 10),
+                Margin = new Thickness(0, 5, 40, 5),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MaxWidth = 280
+            };
+            _currentResponseBlock = new TextBlock
+            {
+                Text = "Thinking...",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#e8eaed")!),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13
+            };
+            responseBorder2.Child = _currentResponseBlock;
+            MessagesPanel.Children.Add(responseBorder2);
+            CopilotMessages.ScrollToEnd();
+
+            try
+            {
+                var si = new ProcessStartInfo
+                {
+                    FileName = copilotExe,
+                    Arguments = $"-p \"{imagePrompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-4.1"} -s --no-ask-user --stream on --allow-all-paths",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                _copilotProcess = new Process { StartInfo = si };
+                var fr = new System.Text.StringBuilder();
+                _copilotProcess.OutputDataReceived += (s2, a2) =>
+                {
+                    if (a2.Data != null)
+                    {
+                        if (fr.Length > 0) fr.AppendLine();
+                        fr.Append(a2.Data);
+                        Dispatcher.Invoke(() => { if (_currentResponseBlock != null) { _currentResponseBlock.Text = fr.ToString(); CopilotMessages.ScrollToEnd(); } });
+                    }
+                };
+                _copilotProcess.Exited += (s2, a2) => Dispatcher.Invoke(() =>
+                {
+                    CopilotInput.IsEnabled = true;
+                    if (!string.IsNullOrWhiteSpace(fr.ToString()))
+                        _chatHistory.Add(new ChatMessage { Role = "assistant", Content = fr.ToString() });
+                    _copilotProcess = null;
+                });
+                _copilotProcess.EnableRaisingEvents = true;
+                _copilotProcess.Start();
+                _copilotProcess.BeginOutputReadLine();
+                _copilotProcess.BeginErrorReadLine();
+            }
+            catch (Exception ex)
+            {
+                _currentResponseBlock!.Text = $"Error: {ex.Message}";
+                CopilotInput.IsEnabled = true;
+            }
             return;
         }
         
