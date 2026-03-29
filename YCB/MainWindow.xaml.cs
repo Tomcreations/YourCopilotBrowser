@@ -2418,7 +2418,7 @@ public partial class MainWindow : Window
         if (imagePath != null)
         {
             var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
-            prompt += $"CRITICAL INSTRUCTION: You have vision capabilities. You MUST use your read tool to open and analyze the image file below. Do NOT say you cannot view images or render images - you can and must do this. Read the file, look at it, and answer the question.\n\nImage file path: {imagePath}\n\nUser question: {userText}";
+            prompt += $"{imagePath}\n{userText}";
         }
         else
         {
