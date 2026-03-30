@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private WindowState _savedWindowState;
     private CancellationTokenSource? _suggestCts;
+    private System.Windows.Threading.DispatcherTimer? _suggestCloseTimer;
     private bool _userEditingUrl = false;
     
     public MainWindow() : this(false, null) { }
@@ -125,6 +126,7 @@ public partial class MainWindow : Window
         
         ApplyTheme();
         ApplyAllSettings();
+        ApplyWindowPositionFromSettings();
         
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
@@ -364,13 +366,68 @@ public partial class MainWindow : Window
             _settings.LastTabs = _tabs.Where(t => t.WebView?.Source != null)
                                        .Select(t => t.WebView!.Source!.ToString())
                                        .ToList();
-            
+            // Save window bounds/state (use RestoreBounds to get normal geometry)
+            try
+            {
+                var restore = RestoreBounds;
+                if (restore.Width > 0 && restore.Height > 0)
+                {
+                    _settings.WindowLeft = restore.Left;
+                    _settings.WindowTop = restore.Top;
+                    _settings.WindowWidth = restore.Width;
+                    _settings.WindowHeight = restore.Height;
+                }
+                _settings.WindowState = WindowState == WindowState.Maximized ? "Maximized" : "Normal";
+            }
+            catch { }
             var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_settingsPath, json);
         }
         catch { }
     }
-    
+
+    private void ApplyWindowPositionFromSettings()
+    {
+        try
+        {
+            if (_settings.WindowWidth.HasValue && _settings.WindowHeight.HasValue)
+            {
+                var work = SystemParameters.WorkArea;
+                double w = _settings.WindowWidth.Value;
+                double h = _settings.WindowHeight.Value;
+                double left = _settings.WindowLeft ?? (work.Left + (work.Width - w) / 2);
+                double top = _settings.WindowTop ?? (work.Top + (work.Height - h) / 2);
+                // Clamp to work area
+                if (left + w > work.Right) left = work.Right - w;
+                if (top + h > work.Bottom) top = work.Bottom - h;
+                if (left < work.Left) left = work.Left;
+                if (top < work.Top) top = work.Top;
+                Width = Math.Max(300, Math.Min(w, work.Width));
+                Height = Math.Max(200, Math.Min(h, work.Height));
+                Left = left;
+                Top = top;
+            }
+            if (_settings.WindowState == "Maximized")
+            {
+                WindowState = WindowState.Maximized;
+            }
+        }
+        catch { }
+    }
+
+    private bool IsRestorableUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return false;
+        if (url.StartsWith("http://") || url.StartsWith("https://")) return true;
+        if (url.StartsWith("ycb://"))
+        {
+            var page = url.Substring("ycb://".Length).Split(new[] {'/', '?'}, StringSplitOptions.RemoveEmptyEntries)[0];
+            var disallowed = new[] { "settings", "guide", "passwords" };
+            return !disallowed.Contains(page);
+        }
+        return false;
+    }
+
     private async System.Threading.Tasks.Task CreateTab(string url = "ycb://newtab")
     {
         // Handle internal URLs
@@ -596,6 +653,12 @@ public partial class MainWindow : Window
         };
         
         webView.GotFocus += (s, e) => SuggestPopup.IsOpen = false;
+        try
+        {
+            webView.PreviewMouseDown += (s, e) => SuggestPopup.IsOpen = false;
+            webView.MouseDown += (s, e) => SuggestPopup.IsOpen = false;
+        }
+        catch { /* ignore if host doesn't surface these events */ }
 
         webView.NavigationStarting += (s, e) =>
         {
@@ -1637,10 +1700,12 @@ public partial class MainWindow : Window
             var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
             var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
             GetMonitorInfo(monitor, ref info);
-            mmi.ptMaxPosition.x = info.rcMonitor.Left - info.rcMonitor.Left;
-            mmi.ptMaxPosition.y = info.rcMonitor.Top  - info.rcMonitor.Top;
-            mmi.ptMaxSize.x     = info.rcMonitor.Right  - info.rcMonitor.Left;
-            mmi.ptMaxSize.y     = info.rcMonitor.Bottom - info.rcMonitor.Top;
+            // Use the monitor work area (rcWork) to avoid overlapping the taskbar or going off-screen
+            var work = info.rcWork;
+            mmi.ptMaxPosition.x = work.Left;
+            mmi.ptMaxPosition.y = work.Top;
+            mmi.ptMaxSize.x     = work.Right  - work.Left;
+            mmi.ptMaxSize.y     = work.Bottom - work.Top;
             mmi.ptMaxTrackSize.x = mmi.ptMaxSize.x;
             mmi.ptMaxTrackSize.y = mmi.ptMaxSize.y;
             Marshal.StructureToPtr(mmi, lParam, true);
@@ -1679,9 +1744,29 @@ public partial class MainWindow : Window
     
     private void Maximize_Click(object sender, RoutedEventArgs e)
     {
-        // ShowWindow goes straight to Win32 — DWM plays native maximize/restore animation
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        ShowWindow(hwnd, WindowState == WindowState.Maximized ? SW_RESTORE : SW_MAXIMIZE);
+        // Use WPF WindowState to toggle maximize/restore so WPF layout updates correctly.
+        if (WindowState != WindowState.Maximized)
+        {
+            // Save current bounds so we can restore them when un-maximizing
+            _savedLeft = Left;
+            _savedTop = Top;
+            _savedWidth = Width;
+            _savedHeight = Height;
+            _savedWindowState = WindowState;
+            WindowState = WindowState.Maximized;
+        }
+        else
+        {
+            WindowState = WindowState.Normal;
+            // Restore previous bounds if they look valid (>0)
+            if (_savedWidth > 0 && _savedHeight > 0)
+            {
+                Left = _savedLeft;
+                Top = _savedTop;
+                Width = _savedWidth;
+                Height = _savedHeight;
+            }
+        }
     }
     
     private void Close_Click(object sender, RoutedEventArgs e)
@@ -2286,6 +2371,36 @@ public partial class MainWindow : Window
             SuggestionsList.ItemsSource = suggestions;
             SuggestionsList.SelectedIndex = -1;
             SuggestPopup.IsOpen = suggestions.Count > 0;
+
+            if (suggestions.Count > 0)
+            {
+                // Start or reset a short timer to close suggestions when focus moves away (handles clicks into WebView HWND)
+                if (_suggestCloseTimer == null)
+                {
+                    _suggestCloseTimer = new System.Windows.Threading.DispatcherTimer
+                    {
+                        Interval = TimeSpan.FromMilliseconds(150)
+                    };
+                    _suggestCloseTimer.Tick += (ts, te) =>
+                    {
+                        try
+                        {
+                            if (!UrlBox.IsKeyboardFocused && !SuggestionsList.IsKeyboardFocusWithin && !OmniboxBorder.IsMouseOver && !BookmarkBtn.IsKeyboardFocused && !BookmarkBtn.IsMouseOver)
+                            {
+                                SuggestPopup.IsOpen = false;
+                                _suggestCloseTimer?.Stop();
+                            }
+                        }
+                        catch { }
+                    };
+                }
+                _suggestCloseTimer.Stop();
+                _suggestCloseTimer.Start();
+            }
+            else
+            {
+                _suggestCloseTimer?.Stop();
+            }
         }
         catch (TaskCanceledException) { }
     }
@@ -4076,6 +4191,12 @@ public class Settings
     public string YcbModel { get; set; } = "gpt-5-mini";
     public bool HasSeenGuide { get; set; } = false;
     public bool TelemetryEnabled { get; set; } = true;
+    // Window position/state persistence
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public string? WindowState { get; set; }
 }
 
 public class HistoryItem

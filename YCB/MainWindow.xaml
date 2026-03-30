@@ -517,7 +517,7 @@
         </Popup>
 
         <!-- OMNIBAR SUGGESTIONS POPUP -->
-        <Popup x:Name="SuggestPopup" StaysOpen="True" Placement="Bottom"
+        <Popup x:Name="SuggestPopup" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=UrlBox}" AllowsTransparency="True" PopupAnimation="Fade"
                PlacementTarget="{Binding ElementName=OmniboxBorder}"
                AllowsTransparency="True" VerticalOffset="4"
                Width="{Binding ActualWidth, ElementName=OmniboxBorder}">
