@@ -61,6 +61,19 @@ public partial class MainWindow : Window
     private readonly Dictionary<WebView2, CancellationTokenSource> _qdScanCts = new();
     private readonly Dictionary<WebView2, bool> _qdDownloadGoBack = new();
     private readonly Dictionary<WebView2, string> _lastRealPageUrl = new(); // for learning
+
+    // Rolling learn-log sent with every quickdownload request so the server can train
+    private static readonly List<object> _learnLog = new();
+    private static readonly object _learnLogLock = new();
+    private static void AddLearnEntry(string pageUrl, string downloadUrl)
+    {
+        lock (_learnLogLock)
+        {
+            _learnLog.Add(new { pageUrl, downloadUrl, ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+            if (_learnLog.Count > 20) _learnLog.RemoveAt(0);
+        }
+    }
+    private static object[] GetLearnLog() { lock (_learnLogLock) { return _learnLog.ToArray(); } }
     
     public MainWindow() : this(false, null) { }
 
@@ -894,7 +907,15 @@ public partial class MainWindow : Window
                         // Teach the learner: record this download against the page that was open
                         if (_settings.QuickDownloadEnabled &&
                             _lastRealPageUrl.TryGetValue(webView, out var learnPage) && !string.IsNullOrEmpty(learnPage))
+                        {
+                            AddLearnEntry(learnPage, download.Url);
                             _ = LearnDownloadAsync(learnPage, download.Url);
+                            // Also push into the page's JS learn log so next search result request carries it
+                            var jsLearnUrl = download.Url.Replace("\\", "\\\\").Replace("'", "\\'");
+                            var jsPageUrl  = learnPage.Replace("\\", "\\\\").Replace("'", "\\'");
+                            _ = webView.ExecuteScriptAsync(
+                                $"(function(){{window._ycbLearnLog=window._ycbLearnLog||[];window._ycbLearnLog.push({{pageUrl:'{jsPageUrl}',downloadUrl:'{jsLearnUrl}',ts:Date.now()}});if(window._ycbLearnLog.length>20)window._ycbLearnLog.shift();}})();");
+                        }
                     }
                     else if (e.DownloadOperation.State == CoreWebView2DownloadState.Interrupted)
                     {
@@ -4462,7 +4483,7 @@ public partial class MainWindow : Window
     fetch(REMOTE, {
       method: 'POST',
       headers: {'Content-Type':'application/json', 'X-YCB-Client':'1'},
-      body: JSON.stringify({url: url, title: title, snippet: snippet, pageUrl: location.href}),
+      body: JSON.stringify({url: url, title: title, snippet: snippet, pageUrl: location.href, learnLog: window._ycbLearnLog || []}),
       signal: ctrl.signal
     })
     .then(function(r) { clearTimeout(timer); return r.json(); })
@@ -4589,7 +4610,7 @@ public partial class MainWindow : Window
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var payload = JsonSerializer.Serialize(new { url, title, pageUrl = url });
+            var payload = JsonSerializer.Serialize(new { url, title, pageUrl = url, learnLog = GetLearnLog() });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             http.DefaultRequestHeaders.Add("X-YCB-Client", "1");
             var resp = await http.PostAsync("https://ycb.tomcreations.org/d0wnload/quickdownload/", content);
