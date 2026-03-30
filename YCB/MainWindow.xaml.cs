@@ -58,11 +58,9 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _suggestCloseTimer;
     private bool _userEditingUrl = false;
     private static Process? _dlServerProcess;
-    private static int _dlServerPort = 3210;
     private readonly Dictionary<WebView2, CancellationTokenSource> _qdScanCts = new();
     private readonly Dictionary<WebView2, bool> _qdDownloadGoBack = new();
     private readonly Dictionary<WebView2, string> _lastRealPageUrl = new(); // for learning
-    private bool _qdBarVisible = false;// tracks whether download bar is currently injected
     
     public MainWindow() : this(false, null) { }
 
@@ -146,9 +144,7 @@ public partial class MainWindow : Window
             SidebarColumn.Width = new GridLength(0);
         }
 
-        // Start Quick Download server if beta feature is enabled
-        if (_settings.QuickDownloadEnabled)
-            StartDlServer();
+        // Quick Download uses a remote endpoint — no local server needed
         
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
@@ -701,7 +697,7 @@ public partial class MainWindow : Window
             if (_qdScanCts.TryGetValue(webView, out var oldCts)) { oldCts.Cancel(); oldCts.Dispose(); _qdScanCts.Remove(webView); }
             // Reset bar state for the active tab
             var navIdx = GetTabIndexForWebView(webView);
-            if (navIdx == _activeTabIndex) { _qdBarVisible = false; }
+            // bar state reset handled by JS on next navigation
             var idx = GetTabIndexForWebView(webView);
             if (idx == _activeTabIndex)
             {
@@ -1082,8 +1078,7 @@ public partial class MainWindow : Window
         RefreshBookmarkStar();
 
         // Reset quick download bar state for the newly active tab
-        if (_settings.QuickDownloadEnabled)
-            _qdBarVisible = false;
+        if (_settings.QuickDownloadEnabled) { /* bar state reset on next page load */ }
     }
     
     private void CloseTab_Click(object sender, RoutedEventArgs e)
@@ -4349,7 +4344,7 @@ public partial class MainWindow : Window
   if (!_ok) return;
   if (window._ycbSE) return; window._ycbSE = 1;
 
-  var SERVER = 'http://127.0.0.1:3210';
+  var REMOTE = 'https://ycb.tomcreations.org/d0wnload/quickdownload/';
   var _cache = new Map();
   var MAX_RESULTS = 5;
 
@@ -4445,13 +4440,29 @@ public partial class MainWindow : Window
     var h3 = a.querySelector('h3');
     if (h3) title = h3.textContent;
 
-    var ctrl = new AbortController();
-    var timer = setTimeout(function() { ctrl.abort(); }, 5000);
+    // Scrape the search result snippet so the remote server has context
+    var snippet = '';
+    if (container) {
+      // Try known snippet selectors across search engines
+      var snipEl = container.querySelector('.VwiC3b, [data-sncf], .b_caption p, .result__snippet, .IsZvec');
+      if (snipEl) {
+        snippet = snipEl.textContent.trim().slice(0, 300);
+      } else {
+        // Fallback: grab visible text from the container, skip the title itself
+        var allText = container.textContent || '';
+        var titleIdx = title ? allText.indexOf(title) : -1;
+        var after = titleIdx >= 0 ? allText.slice(titleIdx + title.length) : allText;
+        snippet = after.trim().slice(0, 300);
+      }
+    }
 
-    fetch(SERVER + '/api/get-download-link', {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, 8000);
+
+    fetch(REMOTE, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({url: url, title: title}),
+      headers: {'Content-Type':'application/json', 'X-YCB-Client':'1'},
+      body: JSON.stringify({url: url, title: title, snippet: snippet, pageUrl: location.href}),
       signal: ctrl.signal
     })
     .then(function(r) { clearTimeout(timer); return r.json(); })
@@ -4530,7 +4541,8 @@ public partial class MainWindow : Window
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
             var payload = JsonSerializer.Serialize(new { pageUrl, downloadUrl });
-            await http.PostAsync($"http://127.0.0.1:{_dlServerPort}/api/learn",
+            http.DefaultRequestHeaders.Add("X-YCB-Client", "1");
+            await http.PostAsync("https://ycb.tomcreations.org/d0wnload/learn/",
                 new StringContent(payload, Encoding.UTF8, "application/json"));
         }
         catch { }
@@ -4569,20 +4581,18 @@ public partial class MainWindow : Window
     {
         if (!_settings.QuickDownloadEnabled) return;
 
-        // Ensure server is up
-        StartDlServer();
-
-        // Wait a bit for server to start if just launched
+        // Remote endpoint — no local server needed; small delay lets page settle
         try { await Task.Delay(600, ct); } catch (OperationCanceledException) { return; }
 
         if (ct.IsCancellationRequested) return;
 
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-            var payload = JsonSerializer.Serialize(new { url, title });
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var payload = JsonSerializer.Serialize(new { url, title, pageUrl = url });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            var resp = await http.PostAsync($"http://127.0.0.1:{_dlServerPort}/api/get-download-link", content);
+            http.DefaultRequestHeaders.Add("X-YCB-Client", "1");
+            var resp = await http.PostAsync("https://ycb.tomcreations.org/d0wnload/quickdownload/", content);
 
             if (ct.IsCancellationRequested || !resp.IsSuccessStatusCode) return;
 
@@ -4618,7 +4628,6 @@ public partial class MainWindow : Window
                 if (!ct.IsCancellationRequested)
                 {
                     await webView.ExecuteScriptAsync(script);
-                    _qdBarVisible = true;
                 }
             });
         }
