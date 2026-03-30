@@ -157,7 +157,9 @@ public partial class MainWindow : Window
             SidebarColumn.Width = new GridLength(0);
         }
 
-        // Quick Download uses a remote endpoint — no local server needed
+        // Quick Download: start local server if enabled
+        if (_settings.QuickDownloadEnabled)
+            StartDlServer();
         
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
@@ -4365,7 +4367,7 @@ public partial class MainWindow : Window
   if (!_ok) return;
   if (window._ycbSE) return; window._ycbSE = 1;
 
-  var REMOTE = 'https://ycb.tomcreations.org/d0wnload/quickdownload/';
+  var REMOTE = 'http://127.0.0.1:3210/api/get-download-link';
   var _cache = new Map();
   var MAX_RESULTS = 5;
 
@@ -4563,7 +4565,7 @@ public partial class MainWindow : Window
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
             var payload = JsonSerializer.Serialize(new { pageUrl, downloadUrl });
             http.DefaultRequestHeaders.Add("X-YCB-Client", "1");
-            await http.PostAsync("https://ycb.tomcreations.org/d0wnload/learn/",
+            await http.PostAsync("http://127.0.0.1:3210/api/learn",
                 new StringContent(payload, Encoding.UTF8, "application/json"));
         }
         catch { }
@@ -4613,7 +4615,7 @@ public partial class MainWindow : Window
             var payload = JsonSerializer.Serialize(new { url, title, pageUrl = url, learnLog = GetLearnLog() });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             http.DefaultRequestHeaders.Add("X-YCB-Client", "1");
-            var resp = await http.PostAsync("https://ycb.tomcreations.org/d0wnload/quickdownload/", content);
+            var resp = await http.PostAsync("http://127.0.0.1:3210/api/get-download-link", content);
 
             if (ct.IsCancellationRequested || !resp.IsSuccessStatusCode) return;
 
