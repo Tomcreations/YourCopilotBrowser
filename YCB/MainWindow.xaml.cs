@@ -806,14 +806,15 @@ public partial class MainWindow : Window
                 if (!msgDict.TryGetValue("url", out var urlEl)) return;
                 var dlUrl = urlEl.GetString();
                 if (string.IsNullOrEmpty(dlUrl)) return;
-                // Navigate the active tab to the download URL; GoBack fires automatically when download starts
-                await Dispatcher.InvokeAsync(() =>
+                // Trigger the download via a hidden <a> click so the user stays on the search page
+                await Dispatcher.InvokeAsync(async () =>
                 {
                     if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
                     {
                         var activeWv = _tabs[_activeTabIndex].WebView;
-                        _qdDownloadGoBack[activeWv] = true;
-                        activeWv.CoreWebView2?.Navigate(dlUrl);
+                        var safe = dlUrl.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", "").Replace("\n", "");
+                        await activeWv.ExecuteScriptAsync(
+                            $"(function(){{var a=document.createElement('a');a.href='{safe}';a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);}})();");
                     }
                 });
             }
@@ -4383,7 +4384,7 @@ public partial class MainWindow : Window
     row.innerHTML = '';
     if (!links.length) {
       row.style.color = '#bdc1c6';
-      row.textContent = 'No installation links';
+      row.textContent = 'No download links found';
       return;
     }
     var icon = document.createElement('span');
@@ -4400,39 +4401,45 @@ public partial class MainWindow : Window
     } else {
       var sel = document.createElement('select');
       sel.style.cssText = 'border:1px solid #dadce0;border-radius:4px;padding:1px 5px;font-size:11px;color:#202124;background:#fff;cursor:pointer;max-width:340px;flex-shrink:1';
-      sel.addEventListener('click', function(ev) { ev.preventDefault(); ev.stopPropagation(); });
-      sel.addEventListener('mousedown', function(ev) { ev.stopPropagation(); });
+      // Stop ALL events from bubbling to the search result anchor
+      ['click','mousedown','mouseup','pointerdown','pointerup','touchstart','touchend'].forEach(function(evt) {
+        sel.addEventListener(evt, function(ev) { ev.stopPropagation(); ev.preventDefault(); }, true);
+      });
+      // Don't let change event bubble
+      sel.addEventListener('change', function(ev) { ev.stopPropagation(); });
 
-      // Group by OS category using <optgroup>
+      // Group by OS — 'Any' files listed under their type, not under Windows
       var groups = {};
       links.forEach(function(l) {
-        var cat = l.os || 'Other';
+        var cat = (!l.os || l.os === 'Any') ? 'Files' : l.os;
         if (!groups[cat]) groups[cat] = [];
         groups[cat].push(l);
       });
-      var catOrder = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Other'];
+      var catOrder = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Files'];
+      // If every link is in Files, skip the optgroup header
+      var allFiles = Object.keys(groups).length === 1 && groups['Files'];
       catOrder.forEach(function(cat) {
         if (!groups[cat] || !groups[cat].length) return;
-        var grp = groups[cat].length > 1 || Object.keys(groups).length > 1
-          ? document.createElement('optgroup')
-          : null;
+        var useGroup = !allFiles && (groups[cat].length > 1 || Object.keys(groups).length > 1);
+        var grp = useGroup ? document.createElement('optgroup') : null;
         if (grp) { grp.label = cat; sel.appendChild(grp); }
         groups[cat].forEach(function(l) {
           var o = document.createElement('option');
           o.value = l.url;
-          var fn2 = getFileName(l.url) || l.url;
-          o.textContent = l.label || fn2;
+          o.textContent = l.label || getFileName(l.url) || l.url;
           (grp || sel).appendChild(o);
         });
       });
 
       row.appendChild(sel);
       var dlBtn = makeBtn('Download', null);
-      dlBtn.onclick = function(ev) {
+      dlBtn.addEventListener('click', function(ev) {
         ev.preventDefault(); ev.stopPropagation();
+        var chosen = sel.value;
+        if (!chosen) return;
         dlBtn.textContent = '\u21ba Opening\u2026'; dlBtn.disabled = true;
-        sendDl(sel.value);
-      };
+        setTimeout(function() { sendDl(chosen); }, 10); // defer so select value is stable
+      }, true);
       row.appendChild(dlBtn);
     }
   }

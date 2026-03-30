@@ -140,16 +140,32 @@ function classifyDownloadLink(url: string, linkText: string): DownloadOption {
   else if (EXT_CODE.some(e => urlNoQuery.endsWith(e)))     type = 'Package';
   else if (combined.includes('portable') || combined.includes('standalone')) type = 'Portable';
 
-  // ── OS
-  let os = 'Windows';
-  if      (EXT_MACOS.some(e => urlNoQuery.endsWith(e)) || combined.includes('mac') || combined.includes('darwin') || combined.includes('osx') || combined.includes('macos')) os = 'macOS';
-  else if (EXT_LINUX.some(e => urlNoQuery.endsWith(e)) || combined.includes('linux') || combined.includes('.tar.gz') || combined.includes('ubuntu') || combined.includes('debian') || combined.includes('fedora')) os = 'Linux';
-  else if (EXT_MOBILE.some(e => urlNoQuery.endsWith(e))) {
-    if (combined.includes('ios') || combined.includes('iphone') || combined.includes('ipad') || urlNoQuery.endsWith('.ipa')) os = 'iOS';
-    else os = 'Android';
+  // ── OS — only set a specific OS when the file type implies it OR the URL hints at it.
+  //         Images, docs, fonts, media, generic archives → 'Any'
+  const urlHintsMac     = combined.match(/\bmac\b|darwin|osx|macos/) != null;
+  const urlHintsLinux   = combined.match(/\blinux\b|ubuntu|debian|fedora|centos|arch\b/) != null;
+  const urlHintsWindows = combined.match(/\bwin(dows|32|64)?\b|\bx64\b.*setup|\bsetup\b.*x64/) != null;
+
+  let os = 'Any'; // default — only override when we have a real signal
+
+  if (EXT_MACOS.some(e => urlNoQuery.endsWith(e)) || urlHintsMac) {
+    os = 'macOS';
+  } else if (EXT_LINUX.some(e => urlNoQuery.endsWith(e)) || urlHintsLinux) {
+    os = 'Linux';
+  } else if (EXT_MOBILE.some(e => urlNoQuery.endsWith(e))) {
+    os = (combined.match(/\bios\b|iphone|ipad/) || urlNoQuery.endsWith('.ipa')) ? 'iOS' : 'Android';
+  } else if (EXT_INSTALLER.some(e => urlNoQuery.endsWith(e))) {
+    // Installers: only call it Windows if the extension is Windows-only OR URL says so
+    const winOnly = ['.exe','.msi','.msix','.msixbundle','.appx','.appxbundle'].some(e => urlNoQuery.endsWith(e));
+    os = (winOnly || urlHintsWindows) ? 'Windows' : 'Any';
+  } else if (EXT_ARCHIVE.some(e => urlNoQuery.endsWith(e)) || EXT_ISO.some(e => urlNoQuery.endsWith(e)) || EXT_CODE.some(e => urlNoQuery.endsWith(e))) {
+    // Archives/ISOs/packages: use URL hints, otherwise Any
+    if (urlHintsMac)     os = 'macOS';
+    else if (urlHintsLinux)   os = 'Linux';
+    else if (urlHintsWindows) os = 'Windows';
+    else os = 'Any';
   }
-  else if (EXT_IMAGE.some(e => urlNoQuery.endsWith(e)) || EXT_DOCUMENT.some(e => urlNoQuery.endsWith(e)) || EXT_FONT.some(e => urlNoQuery.endsWith(e)) || EXT_MEDIA.some(e => urlNoQuery.endsWith(e))) os = 'Any';
-  else if (EXT_ISO.some(e => urlNoQuery.endsWith(e))) os = 'Any';
+  // Images, documents, fonts, media — always 'Any' (no OS override needed)
 
   // ── Arch
   let arch = '';
@@ -173,8 +189,15 @@ function classifyDownloadLink(url: string, linkText: string): DownloadOption {
 
   const isLatest = combined.includes('latest') || combined.includes('stable') || combined.includes('current');
 
-  const parts = [os !== 'Windows' && os !== 'Any' ? os : '', arch, type].filter(Boolean);
-  const label = parts.join(' ') || type;
+  // For Any-OS files, show filename as the label; for platform files show OS + arch + type
+  let label: string;
+  if (os === 'Any') {
+    const fname = url.split('/').pop()?.split('?')[0] || '';
+    label = fname || type;
+  } else {
+    const parts = [os !== 'Windows' ? os : '', arch, type].filter(Boolean);
+    label = parts.join(' ') || type;
+  }
 
   return { url, os, arch, type, version, isLatest, confidence, label };
 }
