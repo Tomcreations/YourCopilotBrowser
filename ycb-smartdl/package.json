@@ -1,0 +1,20 @@
+{
+  "name": "ycb-smartdl",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild smartdl.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/smartdl.cjs --external:fsevents",
+    "sea": "npm run build && node --experimental-sea-config sea-config.json"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "esbuild": "^0.24.0",
+    "postject": "^1.0.0-alpha.6",
+    "typescript": "~5.8.2"
+  }
+}

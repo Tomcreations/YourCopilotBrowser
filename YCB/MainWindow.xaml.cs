@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using Microsoft.Win32;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -40,6 +42,8 @@ public partial class MainWindow : Window
     private double _zoomFactor = 1.0;
     private readonly bool _isIncognito;
     private readonly List<ChatMessage> _chatHistory = new();
+    private static readonly bool _aiEnabled =
+        (Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\YCB", "AIOption", "on") as string ?? "on") != "off";
     private Process? _copilotProcess;
     private TextBlock? _currentResponseBlock;
     private string? _startupUrl;
@@ -53,6 +57,12 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _suggestCts;
     private System.Windows.Threading.DispatcherTimer? _suggestCloseTimer;
     private bool _userEditingUrl = false;
+    private static Process? _dlServerProcess;
+    private static int _dlServerPort = 3210;
+    private readonly Dictionary<WebView2, CancellationTokenSource> _qdScanCts = new();
+    private readonly Dictionary<WebView2, bool> _qdDownloadGoBack = new();
+    private readonly Dictionary<WebView2, string> _lastRealPageUrl = new(); // for learning
+    private bool _qdBarVisible = false;// tracks whether download bar is currently injected
     
     public MainWindow() : this(false, null) { }
 
@@ -127,19 +137,31 @@ public partial class MainWindow : Window
         ApplyTheme();
         ApplyAllSettings();
         ApplyWindowPositionFromSettings();
+
+        // Hide all AI UI if AI was disabled during install
+        if (!_aiEnabled)
+        {
+            CopilotBtn.Visibility = Visibility.Collapsed;
+            CopilotSidebar.Visibility = Visibility.Collapsed;
+            SidebarColumn.Width = new GridLength(0);
+        }
+
+        // Start Quick Download server if beta feature is enabled
+        if (_settings.QuickDownloadEnabled)
+            StartDlServer();
         
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
         {
-            foreach (var url in _settings.LastTabs)
-            {
+            var tabsToRestore = _settings.LastTabs.ToList();
+            foreach (var url in tabsToRestore)
                 await CreateTab(url);
-            }
+            _settings.LastTabs = null;
         }
         else if (!_isIncognito && _settings.StartupMode == "ask" && _settings.LastTabs?.Count > 0)
         {
             await CreateTab(_settings.HomePage ?? "ycb://newtab");
-            await Task.Delay(250); // let window render before showing prompt
+            await Task.Delay(300);
             ShowRestorePrompt();
         }
         else
@@ -265,6 +287,9 @@ public partial class MainWindow : Window
                     UrlBox.SelectAll();
                     e.Handled = true;
                     break;
+                case Key.D:
+                    // Quick Download keyboard shortcut removed (feature is always-on)
+                    break;
                 case Key.H:
                     _ = CreateTab("ycb://history");
                     e.Handled = true;
@@ -363,9 +388,12 @@ public partial class MainWindow : Window
         try
         {
             _settings.DarkMode = _isDarkMode;
-            _settings.LastTabs = _tabs.Where(t => t.WebView?.Source != null)
-                                       .Select(t => t.WebView!.Source!.ToString())
-                                       .ToList();
+            // Only save actual websites — no ycb:// internal pages
+            _settings.LastTabs = _tabs
+                .Where(t => !string.IsNullOrEmpty(t.Url) &&
+                            (t.Url!.StartsWith("http://") || t.Url.StartsWith("https://")))
+                .Select(t => t.Url!)
+                .ToList();
             // Save window bounds/state (use RestoreBounds to get normal geometry)
             try
             {
@@ -475,6 +503,10 @@ public partial class MainWindow : Window
         webView.DefaultBackgroundColor = _isDarkMode 
             ? System.Drawing.Color.FromArgb(255, 32, 33, 36)  // #202124
             : System.Drawing.Color.FromArgb(255, 255, 255, 255);  // white
+
+        // Inject Quick Download enhancer early — runs at document creation on every navigation
+        if (_settings.QuickDownloadEnabled)
+            await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(GetSearchEnhancerScript());
         
         // Setup event handlers
         SetupWebViewEvents(webView, _tabs.Count - 1);
@@ -665,6 +697,11 @@ public partial class MainWindow : Window
             SuggestPopup.IsOpen = false;
             _navStartTimes[webView] = DateTime.UtcNow;
             _autofillShownForTab.Remove(webView);
+            // Cancel any pending quick-download scan for this tab
+            if (_qdScanCts.TryGetValue(webView, out var oldCts)) { oldCts.Cancel(); oldCts.Dispose(); _qdScanCts.Remove(webView); }
+            // Reset bar state for the active tab
+            var navIdx = GetTabIndexForWebView(webView);
+            if (navIdx == _activeTabIndex) { _qdBarVisible = false; }
             var idx = GetTabIndexForWebView(webView);
             if (idx == _activeTabIndex)
             {
@@ -679,7 +716,6 @@ public partial class MainWindow : Window
             var idx = GetTabIndexForWebView(webView);
             if (idx >= 0 && idx < _tabs.Count)
             {
-                UpdateNavButtons();
                 
                 // Apply zoom
                 webView.ZoomFactor = _zoomFactor;
@@ -708,6 +744,18 @@ public partial class MainWindow : Window
                                         ? (int)(DateTime.UtcNow - t0).TotalMilliseconds : -1;
                         _navStartTimes.Remove(webView);
                         ErrorReporter.Track("NavOk", new() { ["host"] = navHost, ["ms"] = navMs });
+
+                        // Track last real page URL for download learning
+                        if (!src2.StartsWith("about:") && !src2.StartsWith("ycb://"))
+                            _lastRealPageUrl[webView] = src2;
+
+                        // If this navigation was triggered by Quick Download and ended on an HTML page
+                        // (i.e. DownloadStarting never fired), go back to the search results
+                        if (_qdDownloadGoBack.TryGetValue(webView, out var qdbPending) && qdbPending)
+                        {
+                            _qdDownloadGoBack[webView] = false;
+                            Dispatcher.InvokeAsync(() => { if (webView.CoreWebView2?.CanGoBack == true) webView.CoreWebView2.GoBack(); });
+                        }
                     }
                     else
                     {
@@ -735,6 +783,39 @@ public partial class MainWindow : Window
         webView.CoreWebView2.GetDevToolsProtocolEventReceiver("Runtime.consoleAPICalled")
             .DevToolsProtocolEventReceived += async (s2, args) => await HandleWebConsole(webView, args);
         webView.CoreWebView2.CallDevToolsProtocolMethodAsync("Runtime.enable", "{}");
+
+        // Handle quickdownload:open messages from injected bars on regular pages
+        webView.CoreWebView2.WebMessageReceived += async (s, msgArgs) =>
+        {
+            try
+            {
+                var msgDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(msgArgs.WebMessageAsJson);
+                if (msgDict == null) return;
+                if (!msgDict.TryGetValue("type", out var typeEl) || typeEl.GetString() != "quickdownload:open") return;
+                if (!msgDict.TryGetValue("url", out var urlEl)) return;
+                var dlUrl = urlEl.GetString();
+                if (string.IsNullOrEmpty(dlUrl)) return;
+                // Navigate the active tab to the download URL; GoBack fires automatically when download starts
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
+                    {
+                        var activeWv = _tabs[_activeTabIndex].WebView;
+                        _qdDownloadGoBack[activeWv] = true;
+                        activeWv.CoreWebView2?.Navigate(dlUrl);
+                    }
+                });
+            }
+            catch { /* not a quickdownload message */ }
+        };
+        webView.CoreWebView2.SourceChanged += (s, e) =>
+        {
+            var src = webView.CoreWebView2.Source ?? "";
+            if (string.IsNullOrEmpty(src) || src.StartsWith("file:///") || src.StartsWith("about:")) return;
+            var idx = GetTabIndexForWebView(webView);
+            if (idx >= 0 && idx < _tabs.Count)
+                _tabs[idx].Url = src;
+        };
         
         webView.CoreWebView2.DocumentTitleChanged += (s, e) =>
         {
@@ -789,6 +870,13 @@ public partial class MainWindow : Window
                 TotalBytes = (long)(e.DownloadOperation.TotalBytesToReceive ?? 0)
             };
             ShowDownloadShelf(download);
+
+            // If this download was triggered by Quick Download, go back to the search results
+            if (_qdDownloadGoBack.TryGetValue(webView, out var needsBack) && needsBack)
+            {
+                _qdDownloadGoBack[webView] = false;
+                Dispatcher.InvokeAsync(() => { if (webView.CoreWebView2?.CanGoBack == true) webView.CoreWebView2.GoBack(); });
+            }
             
             e.DownloadOperation.StateChanged += (sender, args) =>
             {
@@ -806,6 +894,11 @@ public partial class MainWindow : Window
                         var dlKb  = (int)(download.TotalBytes / 1024);
                         var dlDur = (int)(DateTime.Now - download.StartTime).TotalSeconds;
                         ErrorReporter.Track("DlDone", new() { ["ext"] = dlExt, ["kb"] = dlKb, ["dur"] = dlDur });
+
+                        // Teach the learner: record this download against the page that was open
+                        if (_settings.QuickDownloadEnabled &&
+                            _lastRealPageUrl.TryGetValue(webView, out var learnPage) && !string.IsNullOrEmpty(learnPage))
+                            _ = LearnDownloadAsync(learnPage, download.Url);
                     }
                     else if (e.DownloadOperation.State == CoreWebView2DownloadState.Interrupted)
                     {
@@ -987,6 +1080,10 @@ public partial class MainWindow : Window
         
         UpdateNavButtons();
         RefreshBookmarkStar();
+
+        // Reset quick download bar state for the newly active tab
+        if (_settings.QuickDownloadEnabled)
+            _qdBarVisible = false;
     }
     
     private void CloseTab_Click(object sender, RoutedEventArgs e)
@@ -1209,7 +1306,9 @@ public partial class MainWindow : Window
                             incognito_ai_enabled = (_settings.IncognitoAIEnabled ?? false).ToString().ToLower(),
                             browser_theme = _settings.DarkMode ? "dark" : "light",
                             telemetry_enabled = _settings.TelemetryEnabled.ToString().ToLower(),
-                            user_id = ErrorReporter.UserId
+                            user_id = ErrorReporter.UserId,
+                            ai_enabled = _aiEnabled ? "on" : "off",
+                            quick_download_enabled = _settings.QuickDownloadEnabled ? "on" : "off"
                         };
                         var settingsDataJson = JsonSerializer.Serialize(settingsData);
                         await webView.ExecuteScriptAsync($"window.loadSettings && window.loadSettings({settingsDataJson})");
@@ -1245,6 +1344,18 @@ public partial class MainWindow : Window
                         var passwords = LoadPasswordsDecrypted();
                         var passwordsJson = JsonSerializer.Serialize(passwords);
                         await webView.ExecuteScriptAsync($"window.setPasswords && window.setPasswords({passwordsJson})");
+                        break;
+
+                    case "guide":
+                        if (!_aiEnabled)
+                        {
+                            await webView.ExecuteScriptAsync(@"
+                                (function() {
+                                    var el = document.getElementById('ai-setup-section');
+                                    if (el) el.style.display = 'none';
+                                })();
+                            ");
+                        }
                         break;
                 }
             }
@@ -3682,9 +3793,40 @@ public partial class MainWindow : Window
         {
             Text = $"You had {count} tab{(count == 1 ? "" : "s")} open last time",
             Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9aa0a6")!),
-            FontSize = 12, Margin = new Thickness(0, 0, 0, 14)
+            FontSize = 12, Margin = new Thickness(0, 0, 0, 8)
         };
         stack.Children.Add(subBlock);
+
+        // List each tab by host + path
+        var tabList = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+        var displayTabs = _settings.LastTabs!.Take(6).ToList();
+        foreach (var url in displayTabs)
+        {
+            string display;
+            try
+            {
+                var uri = new Uri(url);
+                var path = uri.AbsolutePath.TrimEnd('/');
+                display = path.Length > 1 ? uri.Host + path : uri.Host;
+            }
+            catch { display = url.Length > 40 ? url[..40] + "…" : url; }
+            if (display.Length > 45) display = display[..45] + "…";
+            tabList.Children.Add(new TextBlock
+            {
+                Text = "• " + display,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#bdc1c6")!),
+                FontSize = 11, Margin = new Thickness(4, 1, 0, 1),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+        }
+        if (count > 6)
+            tabList.Children.Add(new TextBlock
+            {
+                Text = $"  + {count - 6} more…",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5f6368")!),
+                FontSize = 11, Margin = new Thickness(4, 1, 0, 0)
+            });
+        stack.Children.Add(tabList);
 
         // Buttons
         var btnRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -3713,9 +3855,10 @@ public partial class MainWindow : Window
         {
             popup.Close();
             var tabsToRestore = _settings.LastTabs!.ToList();
-            // Close the placeholder new tab, then restore
+            // Open restored tabs first, then close the placeholder
             foreach (var url in tabsToRestore)
                 await CreateTab(url);
+            // Now safe to close the placeholder (index 0) since we have other tabs open
             if (_tabs.Count > tabsToRestore.Count)
                 CloseTab(0);
         };
@@ -3726,7 +3869,6 @@ public partial class MainWindow : Window
 
         border.Child = stack;
         popup.Content = border;
-        popup.Deactivated += (s, a) => { try { if (popup.IsVisible) popup.Close(); } catch { } };
         popup.Show();
     }
 
@@ -4106,6 +4248,15 @@ public partial class MainWindow : Window
                 ErrorReporter.IsEnabled = _settings.TelemetryEnabled;
                 SaveSettings();
                 break;
+
+            case "quick_download_enabled":
+                _settings.QuickDownloadEnabled = value == "on";
+                SaveSettings();
+                if (_settings.QuickDownloadEnabled)
+                    StartDlServer();
+                else
+                    StopDlServer();
+                break;
         }
     }
     
@@ -4165,8 +4316,413 @@ public partial class MainWindow : Window
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         SaveSettings();
+        StopDlServer();
         base.OnClosing(e);
     }
+
+    private static bool IsSearchPage(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var host = uri.Host.ToLower();
+            var path = uri.AbsolutePath.ToLower();
+            var q    = uri.Query;
+            return (host.Contains("google.")    && path.StartsWith("/search") && q.Contains("q=")) ||
+                   (host.Contains("bing.com")   && path.StartsWith("/search")) ||
+                   (host.Contains("duckduckgo.com") && q.Contains("q=")) ||
+                   (host.Contains("search.yahoo.com")) ||
+                   (host.Contains("ecosia.org") && path.StartsWith("/search"));
+        }
+        catch { return false; }
+    }
+
+    private static string GetSearchEnhancerScript() => """
+(function() {
+  'use strict';
+  // Bail out fast on non-search pages — script is registered on all tabs
+  var _h = location.hostname, _p = location.pathname, _q = location.search;
+  var _ok = (_h.includes('google.') && _p.includes('/search') && _q.includes('q=')) ||
+            (_h.includes('bing.com') && _q.includes('q=')) ||
+            (_h.includes('duckduckgo.com') && _q.includes('q=')) ||
+            (_h.includes('ecosia.org') && _q.includes('q='));
+  if (!_ok) return;
+  if (window._ycbSE) return; window._ycbSE = 1;
+
+  var SERVER = 'http://127.0.0.1:3210';
+  var _cache = new Map();
+  var MAX_RESULTS = 5;
+
+  function getFileName(url) {
+    try {
+      var n = new URL(url).pathname.split('/').pop();
+      if (n && n.includes('.')) return decodeURIComponent(n);
+    } catch(e) {}
+    return null;
+  }
+
+  function renderResult(row, links) {
+    row.innerHTML = '';
+    if (!links.length) {
+      row.style.color = '#bdc1c6';
+      row.textContent = 'No installation links';
+      return;
+    }
+    var icon = document.createElement('span');
+    icon.textContent = '\u2913';
+    icon.style.cssText = 'color:#1a73e8;font-size:13px;flex-shrink:0';
+    row.appendChild(icon);
+    if (links.length === 1) {
+      var fn = links[0].label || getFileName(links[0].url) || links[0].url;
+      var span = document.createElement('span');
+      span.textContent = fn;
+      span.style.cssText = 'color:#202124;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px';
+      row.appendChild(span);
+      row.appendChild(makeBtn('Download', links[0].url));
+    } else {
+      var sel = document.createElement('select');
+      sel.style.cssText = 'border:1px solid #dadce0;border-radius:4px;padding:1px 5px;font-size:11px;color:#202124;background:#fff;cursor:pointer;max-width:340px;flex-shrink:1';
+      sel.addEventListener('click', function(ev) { ev.preventDefault(); ev.stopPropagation(); });
+      sel.addEventListener('mousedown', function(ev) { ev.stopPropagation(); });
+
+      // Group by OS category using <optgroup>
+      var groups = {};
+      links.forEach(function(l) {
+        var cat = l.os || 'Other';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(l);
+      });
+      var catOrder = ['Windows', 'macOS', 'Linux', 'Android', 'iOS', 'Other'];
+      catOrder.forEach(function(cat) {
+        if (!groups[cat] || !groups[cat].length) return;
+        var grp = groups[cat].length > 1 || Object.keys(groups).length > 1
+          ? document.createElement('optgroup')
+          : null;
+        if (grp) { grp.label = cat; sel.appendChild(grp); }
+        groups[cat].forEach(function(l) {
+          var o = document.createElement('option');
+          o.value = l.url;
+          var fn2 = getFileName(l.url) || l.url;
+          o.textContent = l.label || fn2;
+          (grp || sel).appendChild(o);
+        });
+      });
+
+      row.appendChild(sel);
+      var dlBtn = makeBtn('Download', null);
+      dlBtn.onclick = function(ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        dlBtn.textContent = '\u21ba Opening\u2026'; dlBtn.disabled = true;
+        sendDl(sel.value);
+      };
+      row.appendChild(dlBtn);
+    }
+  }
+
+  function processResult(a) {
+    if (a.dataset.ycbDone) return;
+    a.dataset.ycbDone = '1';
+    var url = a.href;
+
+    var container = a.closest('div.g') || a.closest('.MjjYud') ||
+                    a.closest('[data-sokoban-container]') ||
+                    a.closest('.b_algo') ||
+                    a.closest('[data-testid="result"]') ||
+                    a.parentElement;
+    var cite = container && container.querySelector('cite');
+    var insertAfter = (cite && (cite.parentElement || cite)) || a;
+
+    var row = document.createElement('div');
+    row.dataset.ycbRow = '1';
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#70757a;margin:1px 0 4px;font-family:arial,sans-serif;line-height:1.5;min-height:16px';
+    insertAfter.insertAdjacentElement('afterend', row);
+
+    if (_cache.has(url)) { renderResult(row, _cache.get(url)); return; }
+
+    row.textContent = '\u2913 Checking\u2026';
+
+    var title = '';
+    var h3 = a.querySelector('h3');
+    if (h3) title = h3.textContent;
+
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, 5000);
+
+    fetch(SERVER + '/api/get-download-link', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({url: url, title: title}),
+      signal: ctrl.signal
+    })
+    .then(function(r) { clearTimeout(timer); return r.json(); })
+    .then(function(data) {
+      var links = (data && data.downloadLinks) || [];
+      _cache.set(url, links);
+      renderResult(row, links);
+    })
+    .catch(function() { clearTimeout(timer); row.remove(); });
+  }
+
+  function sendDl(url) {
+    if (window.chrome && window.chrome.webview)
+      window.chrome.webview.postMessage({type:'quickdownload:open', url: url});
+    else window.open(url, '_blank');
+  }
+
+  function makeBtn(label, url) {
+    var b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'background:#1a73e8;color:#fff;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;font-weight:500;flex-shrink:0';
+    b.onmouseover = function() { if (!b.disabled) b.style.background='#1558b0'; };
+    b.onmouseout  = function() { if (!b.disabled) b.style.background='#1a73e8'; };
+    if (url) b.onclick = function(ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      b.textContent = '\u21ba Opening\u2026'; b.disabled = true;
+      sendDl(url);
+    };
+    return b;
+  }
+
+  function scan() {
+    var host = location.hostname;
+    var results = [];
+    if (host.includes('google.')) {
+      document.querySelectorAll('#search a[href^="http"]').forEach(function(a) {
+        if (!a.href.includes('google.') && a.querySelector('h3') && !a.dataset.ycbDone) results.push(a);
+      });
+    } else if (host.includes('bing.com')) {
+      document.querySelectorAll('#b_results .b_algo h2 a[href^="http"]').forEach(function(a) {
+        if (!a.dataset.ycbDone) results.push(a);
+      });
+    } else if (host.includes('duckduckgo.com')) {
+      document.querySelectorAll('[data-testid="result-title-a"][href^="http"]').forEach(function(a) {
+        if (!a.dataset.ycbDone) results.push(a);
+      });
+    } else if (host.includes('ecosia.org')) {
+      document.querySelectorAll('.result__title a[href^="http"]').forEach(function(a) {
+        if (!a.dataset.ycbDone) results.push(a);
+      });
+    }
+    results.slice(0, MAX_RESULTS).forEach(processResult);
+  }
+
+  // Scan at DOMContentLoaded (much earlier than NavigationCompleted)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scan, {once: true});
+  } else {
+    scan();
+  }
+
+  // Catch dynamically-loaded results (Google infinite scroll, etc.)
+  var _ycbTimer;
+  new MutationObserver(function() {
+    clearTimeout(_ycbTimer);
+    _ycbTimer = setTimeout(scan, 150);
+  }).observe(document.documentElement, {childList:true, subtree:true});
+})();
+""";
+
+    // ─── Quick Download Server ─────────────────────────────────────────────────
+
+    private static async Task LearnDownloadAsync(string pageUrl, string downloadUrl)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var payload = JsonSerializer.Serialize(new { pageUrl, downloadUrl });
+            await http.PostAsync($"http://127.0.0.1:{_dlServerPort}/api/learn",
+                new StringContent(payload, Encoding.UTF8, "application/json"));
+        }
+        catch { }
+    }
+
+    private static void StartDlServer()
+    {
+        if (_dlServerProcess != null && !_dlServerProcess.HasExited) return;
+
+        var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+        var serverExe = IoPath.Combine(exeDir, "ycb-smartdl.exe");
+        if (!File.Exists(serverExe)) return;
+
+        var psi = new ProcessStartInfo(serverExe)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        try { _dlServerProcess = Process.Start(psi); }
+        catch { /* server unavailable */ }
+    }
+
+    private static void StopDlServer()
+    {
+        try
+        {
+            if (_dlServerProcess != null && !_dlServerProcess.HasExited)
+                _dlServerProcess.Kill(entireProcessTree: true);
+        }
+        catch { }
+        _dlServerProcess = null;
+    }
+
+    private async Task ScanAndInjectDownloadBar(WebView2 webView, string url, string title, CancellationToken ct)
+    {
+        if (!_settings.QuickDownloadEnabled) return;
+
+        // Ensure server is up
+        StartDlServer();
+
+        // Wait a bit for server to start if just launched
+        try { await Task.Delay(600, ct); } catch (OperationCanceledException) { return; }
+
+        if (ct.IsCancellationRequested) return;
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+            var payload = JsonSerializer.Serialize(new { url, title });
+            var content = new StringContent(payload, Encoding.UTF8, "application/json");
+            var resp = await http.PostAsync($"http://127.0.0.1:{_dlServerPort}/api/get-download-link", content);
+
+            if (ct.IsCancellationRequested || !resp.IsSuccessStatusCode) return;
+
+            var json = await resp.Content.ReadAsStringAsync();
+            if (ct.IsCancellationRequested) return;
+
+            using var doc = JsonDocument.Parse(json);
+            var linksEl = doc.RootElement.GetProperty("downloadLinks");
+            if (linksEl.GetArrayLength() == 0) return;
+
+            // Build link objects for injection
+            var linkList = linksEl.EnumerateArray().Select(link =>
+            {
+                var dlUrl = link.GetProperty("url").GetString() ?? "";
+                var os   = link.TryGetProperty("os",   out var o) ? o.GetString() ?? "" : "";
+                var arch = link.TryGetProperty("arch", out var a) ? a.GetString() ?? "" : "";
+                var type = link.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
+                var ver  = link.TryGetProperty("version", out var v) && v.ValueKind != JsonValueKind.Null ? v.GetString() ?? "" : "";
+                var isLatest = link.TryGetProperty("isLatest", out var lat) && lat.GetBoolean();
+                var fileName = IoPath.GetFileName(dlUrl.Split('?')[0]);
+                if (string.IsNullOrEmpty(fileName)) fileName = Uri.TryCreate(dlUrl, UriKind.Absolute, out var u) ? u.Host : dlUrl;
+                var label = $"{os} {arch} {type}".Trim();
+                if (!string.IsNullOrEmpty(ver)) label += $" v{ver}";
+                if (isLatest) label += " ★";
+                return new { url = dlUrl, fileName, label };
+            }).ToList();
+
+            var linksJson = JsonSerializer.Serialize(linkList);
+            var script = BuildDownloadBarScript(linksJson);
+
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    await webView.ExecuteScriptAsync(script);
+                    _qdBarVisible = true;
+                }
+            });
+        }
+        catch (OperationCanceledException) { }
+        catch { /* server not ready, page navigated away, etc. */ }
+    }
+
+    private static string BuildDownloadBarScript(string linksJson)
+    {
+        // Language=JavaScript
+        return $$"""
+(function() {
+  var existing = document.getElementById('_ycb_dl_bar');
+  if (existing) existing.remove();
+
+  var links = {{linksJson}};
+  if (!links || links.length === 0) return;
+
+  var bar = document.createElement('div');
+  bar.id = '_ycb_dl_bar';
+  bar.style.cssText = [
+    'position:fixed','bottom:0','left:0','right:0','z-index:2147483647',
+    'background:rgba(28,29,32,0.97)','border-top:1px solid rgba(255,255,255,0.1)',
+    'padding:10px 16px','display:flex','align-items:center','gap:12px',
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+    'font-size:13px','box-shadow:0 -4px 24px rgba(0,0,0,0.4)',
+    'backdrop-filter:blur(10px)','-webkit-backdrop-filter:blur(10px)'
+  ].join(';');
+
+  // Icon
+  var icon = document.createElement('div');
+  icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  icon.style.cssText = 'flex-shrink:0;display:flex;align-items:center;';
+  bar.appendChild(icon);
+
+  // Label
+  var lbl = document.createElement('span');
+  lbl.textContent = 'Download available';
+  lbl.style.cssText = 'color:#9aa0a6;font-size:12px;flex-shrink:0;';
+  bar.appendChild(lbl);
+
+  // Selector (dropdown if multiple, static text if single)
+  var selector;
+  if (links.length === 1) {
+    selector = document.createElement('span');
+    selector.textContent = links[0].fileName;
+    selector.title = links[0].label;
+    selector.style.cssText = 'color:#e8eaed;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;';
+  } else {
+    selector = document.createElement('select');
+    selector.style.cssText = [
+      'background:#2d2e31','color:#e8eaed','border:1px solid rgba(255,255,255,0.15)',
+      'border-radius:6px','padding:5px 10px','font-size:13px','flex:1','min-width:0',
+      'cursor:pointer','outline:none','max-width:460px'
+    ].join(';');
+    links.forEach(function(l) {
+      var opt = document.createElement('option');
+      opt.value = l.url;
+      opt.textContent = l.label + '  —  ' + l.fileName;
+      selector.appendChild(opt);
+    });
+  }
+  bar.appendChild(selector);
+
+  // Download button
+  var btn = document.createElement('button');
+  btn.textContent = '\u2913 Download';
+  btn.style.cssText = [
+    'background:#1a73e8','color:#fff','border:none','border-radius:6px',
+    'padding:7px 18px','font-size:13px','font-weight:600','cursor:pointer',
+    'flex-shrink:0','white-space:nowrap','transition:background 0.15s'
+  ].join(';');
+  btn.onmouseover = function() { btn.style.background = '#1558b0'; };
+  btn.onmouseout  = function() { btn.style.background = '#1a73e8'; };
+  btn.onclick = function() {
+    var url = links.length === 1 ? links[0].url : selector.value;
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage({ type: 'quickdownload:open', url: url });
+    } else {
+      window.open(url, '_blank');
+    }
+    bar.remove();
+  };
+  bar.appendChild(btn);
+
+  // Close button
+  var cls = document.createElement('button');
+  cls.textContent = '\u00d7';
+  cls.title = 'Dismiss';
+  cls.style.cssText = [
+    'background:transparent','color:#9aa0a6','border:none','border-radius:4px',
+    'padding:4px 8px','font-size:18px','cursor:pointer','flex-shrink:0',
+    'line-height:1','transition:color 0.15s'
+  ].join(';');
+  cls.onmouseover = function() { cls.style.color = '#e8eaed'; };
+  cls.onmouseout  = function() { cls.style.color = '#9aa0a6'; };
+  cls.onclick = function() { bar.remove(); };
+  bar.appendChild(cls);
+
+  document.body.appendChild(bar);
+})();
+""";
+    }
+
 }
 
 // Data classes
@@ -4197,6 +4753,7 @@ public class Settings
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
     public string? WindowState { get; set; }
+    public bool QuickDownloadEnabled { get; set; } = false;
 }
 
 public class HistoryItem

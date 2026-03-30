@@ -159,6 +159,7 @@
     <a class="nav-item" data-section="startup"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>On startup</a>
     <a class="nav-item" data-section="ycb"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="6"/><path d="M8 16c-2.5 1-4 2.5-4 4h16c0-1.5-1.5-3-4-4"/></svg></span>YCB - AI Model</a>
     <a class="nav-item" data-section="privacy"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 9.3 8 10.9C16.5 21.3 20 17 20 12V6L12 2z"/></svg></span>Data &amp; Privacy</a>
+    <a class="nav-item" data-section="beta"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14l3 3 3-3"/></svg></span>Optional Features</a>
     <a class="nav-item" data-section="about"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>About</a>
   </nav>
 </aside>
@@ -341,6 +342,24 @@
     </div>
   </div>
 
+  <!-- Optional Features -->
+  <div id="section-beta" style="display:none">
+    <div class="page-title">Optional Features</div>
+    <div class="page-sub">Experimental features — may change or be removed</div>
+    <div class="section">
+      <div class="section-label">Quick Download</div>
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="row-title">Quick Download</div>
+            <div class="row-desc">Detect download links on any page. Click the ⬇ toolbar button or press <kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:11px">Ctrl+Shift+D</kbd></div>
+          </div>
+          <button class="toggle" id="toggle-quick-download"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- About -->
   <div id="section-about" style="display:none">
     <div class="page-title">About YCB Browser</div>
@@ -430,7 +449,7 @@
 
 <script>
   // ── Navigation ────────────────────────────────────────────────────────────
-  const sections = ['appearance','search','default','startup','ycb','privacy','about'];
+  const sections = ['appearance','search','default','startup','ycb','privacy','beta','about'];
   const navItems = document.querySelectorAll('.nav-item');
 
   function showSection(name) {
@@ -593,6 +612,18 @@
     showToast(on ? 'Diagnostic logging enabled' : 'Diagnostic logging disabled');
   });
 
+  // ── Quick Download beta toggle ────────────────────────────────────────────
+  const qdToggle = document.getElementById('toggle-quick-download');
+  if (qdToggle) {
+    qdToggle.classList.toggle('on', load('quick_download_enabled', 'off') === 'on');
+    qdToggle.addEventListener('click', () => {
+      const on = !qdToggle.classList.contains('on');
+      qdToggle.classList.toggle('on', on);
+      save('quick_download_enabled', on ? 'on' : 'off');
+      showToast(on ? 'Quick Download enabled — toolbar button added' : 'Quick Download disabled');
+    });
+  }
+
   // ── Load settings from C# backend ────────────────────────────────────────
   window.loadSettings = function(data) {
     if (!data) return;
@@ -652,6 +683,18 @@
           });
         });
       }
+    }
+    // ai_enabled — hide everything AI when off
+    if (data.ai_enabled === 'off') {
+      document.querySelectorAll('[data-section="ycb"]').forEach(el => el.style.display = 'none');
+      const ycbSection = document.getElementById('section-ycb');
+      if (ycbSection) ycbSection.style.display = 'none';
+    }
+    // quick_download_enabled
+    if (data.quick_download_enabled !== undefined && qdToggle) {
+      const on = data.quick_download_enabled === 'on';
+      qdToggle.classList.toggle('on', on);
+      localStorage.setItem('quick_download_enabled', data.quick_download_enabled);
     }
   };
 

@@ -18,3 +18,11 @@ Thumbs.db
 Desktop.ini
 
 windowsdesktop-runtime-*.exe
+
+# YCB SmartDL build artifacts (keep source, ignore compiled output)
+ycb-smartdl/node_modules/
+ycb-smartdl/dist/
+ycb-server/
+
+# YCB project — built exe is committed intentionally (used by installer)
+# YCB/ycb-smartdl.exe — tracked

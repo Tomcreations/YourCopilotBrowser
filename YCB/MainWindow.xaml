@@ -517,9 +517,10 @@
         </Popup>
 
         <!-- OMNIBAR SUGGESTIONS POPUP -->
-        <Popup x:Name="SuggestPopup" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=UrlBox}" AllowsTransparency="True" PopupAnimation="Fade"
+        <Popup x:Name="SuggestPopup" StaysOpen="False" Placement="Bottom"
                PlacementTarget="{Binding ElementName=OmniboxBorder}"
-               AllowsTransparency="True" VerticalOffset="4"
+               AllowsTransparency="True" PopupAnimation="Fade"
+               VerticalOffset="4"
                Width="{Binding ActualWidth, ElementName=OmniboxBorder}">
             <Border Background="#2d2e31" CornerRadius="0,0,8,8" Padding="0,4">
                 <Border.BorderBrush>
