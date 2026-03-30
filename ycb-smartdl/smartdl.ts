@@ -63,7 +63,50 @@ app.post('/api/learn', (req, res) => {
   } catch { res.json({ ok: false }); }
 });
 
-// ─── Download Link Classifier ─────────────────────────────────────────────────
+// ─── File type categories ─────────────────────────────────────────────────────
+
+const EXT_INSTALLER = ['.exe', '.msi', '.msix', '.msixbundle', '.appx', '.appxbundle', '.pkg', '.run', '.sh', '.bin'];
+const EXT_ARCHIVE   = ['.zip', '.7z', '.rar', '.tar.gz', '.tgz', '.tar.bz2', '.tar.xz', '.tar.zst', '.gz'];
+const EXT_LINUX     = ['.deb', '.rpm', '.appimage', '.flatpakref', '.snap'];
+const EXT_MOBILE    = ['.apk', '.xapk', '.ipa', '.aab'];
+const EXT_MACOS     = ['.dmg'];
+const EXT_ISO       = ['.iso', '.img', '.bin', '.nrg', '.mdf', '.vhd', '.vhdx', '.vmdk'];
+const EXT_IMAGE     = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif', '.avif', '.heic', '.raw', '.cr2', '.nef', '.psd'];
+const EXT_DOCUMENT  = ['.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods', '.odp', '.rtf', '.epub', '.mobi'];
+const EXT_FONT      = ['.ttf', '.otf', '.woff', '.woff2', '.eot'];
+const EXT_MEDIA     = ['.mp3', '.mp4', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.opus', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.m4v'];
+const EXT_CODE      = ['.py', '.js', '.ts', '.jar', '.war', '.ear', '.nupkg', '.vsix'];
+
+// All extensions that are definitely a direct file, not a page
+const ALL_DIRECT_EXTS = [
+  ...EXT_INSTALLER, ...EXT_ARCHIVE, ...EXT_LINUX, ...EXT_MOBILE, ...EXT_MACOS,
+  ...EXT_ISO, ...EXT_IMAGE, ...EXT_DOCUMENT, ...EXT_FONT, ...EXT_MEDIA, ...EXT_CODE
+];
+
+// URL patterns that are known to be direct CDN download links (not page redirects)
+const CDN_PATTERNS = [
+  'releases/download/',          // GitHub releases
+  'api/releases/assets/',        // GitHub API asset
+  'download.mozilla.org',        // Firefox
+  'get.videolan.org',            // VLC
+  'dl.google.com',               // Google
+  'dl.pstmn.io',                 // Postman
+  'cdn.akamai.steamstatic.com',  // Steam
+  'updates.signal.org',          // Signal
+  'vault.bitwarden.com/download',
+  'discord.com/api/downloads',
+  'laptop-updates.brave.com',
+  'download.techpowerup.com',
+  'downloads.sourceforge.net',
+  'master.dl.sourceforge.net',
+  'netix.dl.sourceforge.net',
+  'cfhcable.dl.sourceforge.net',
+  'download.gimp.org',
+  'download.kde.org',
+  'ftp.mozilla.org',
+];
+
+// ─── Classifier ───────────────────────────────────────────────────────────────
 
 interface DownloadOption {
   url: string;
@@ -73,66 +116,91 @@ interface DownloadOption {
   version?: string;
   isLatest: boolean;
   confidence: number;
-  label?: string; // human-readable name shown in dropdown
+  label?: string;
 }
 
 function classifyDownloadLink(url: string, linkText: string): DownloadOption {
   const lowerUrl = url.toLowerCase();
-  const lowerText = linkText.toLowerCase();
-  const combined = lowerUrl + ' ' + lowerText;
+  const combined = lowerUrl + ' ' + linkText.toLowerCase();
+  // strip query string for extension matching
+  const urlNoQuery = lowerUrl.split('?')[0];
 
-  // OS detection
+  // ── Category / type
+  let type = 'File';
+  if (EXT_INSTALLER.some(e => urlNoQuery.endsWith(e))) type = urlNoQuery.endsWith('.msi') ? 'MSI' : urlNoQuery.endsWith('.msix') || urlNoQuery.endsWith('.msixbundle') ? 'MSIX' : 'Installer';
+  else if (EXT_ARCHIVE.some(e => urlNoQuery.endsWith(e)))  type = 'Archive';
+  else if (EXT_ISO.some(e => urlNoQuery.endsWith(e)))      type = 'ISO/Image';
+  else if (EXT_LINUX.some(e => urlNoQuery.endsWith(e)))    type = urlNoQuery.endsWith('.deb') ? 'DEB' : urlNoQuery.endsWith('.rpm') ? 'RPM' : urlNoQuery.endsWith('.appimage') ? 'AppImage' : 'Linux';
+  else if (EXT_MOBILE.some(e => urlNoQuery.endsWith(e)))   type = urlNoQuery.endsWith('.apk') || urlNoQuery.endsWith('.xapk') ? 'APK' : 'IPA';
+  else if (EXT_MACOS.some(e => urlNoQuery.endsWith(e)))    type = 'DMG';
+  else if (EXT_IMAGE.some(e => urlNoQuery.endsWith(e)))    type = 'Image';
+  else if (EXT_DOCUMENT.some(e => urlNoQuery.endsWith(e))) type = urlNoQuery.endsWith('.pdf') ? 'PDF' : 'Document';
+  else if (EXT_FONT.some(e => urlNoQuery.endsWith(e)))     type = 'Font';
+  else if (EXT_MEDIA.some(e => urlNoQuery.endsWith(e)))    type = 'Media';
+  else if (EXT_CODE.some(e => urlNoQuery.endsWith(e)))     type = 'Package';
+  else if (combined.includes('portable') || combined.includes('standalone')) type = 'Portable';
+
+  // ── OS
   let os = 'Windows';
-  if (combined.includes('mac') || combined.includes('darwin') || combined.includes('.dmg') || combined.includes('osx') || combined.includes('macos')) os = 'macOS';
-  else if (combined.includes('linux') || combined.includes('.deb') || combined.includes('.rpm') || combined.includes('.appimage') || combined.includes('.tar.gz')) os = 'Linux';
-  else if (combined.includes('android') || combined.includes('.apk')) os = 'Android';
-  else if (combined.includes('ios') || combined.includes('iphone') || combined.includes('ipad')) os = 'iOS';
+  if      (EXT_MACOS.some(e => urlNoQuery.endsWith(e)) || combined.includes('mac') || combined.includes('darwin') || combined.includes('osx') || combined.includes('macos')) os = 'macOS';
+  else if (EXT_LINUX.some(e => urlNoQuery.endsWith(e)) || combined.includes('linux') || combined.includes('.tar.gz') || combined.includes('ubuntu') || combined.includes('debian') || combined.includes('fedora')) os = 'Linux';
+  else if (EXT_MOBILE.some(e => urlNoQuery.endsWith(e))) {
+    if (combined.includes('ios') || combined.includes('iphone') || combined.includes('ipad') || urlNoQuery.endsWith('.ipa')) os = 'iOS';
+    else os = 'Android';
+  }
+  else if (EXT_IMAGE.some(e => urlNoQuery.endsWith(e)) || EXT_DOCUMENT.some(e => urlNoQuery.endsWith(e)) || EXT_FONT.some(e => urlNoQuery.endsWith(e)) || EXT_MEDIA.some(e => urlNoQuery.endsWith(e))) os = 'Any';
+  else if (EXT_ISO.some(e => urlNoQuery.endsWith(e))) os = 'Any';
 
-  // Arch detection
+  // ── Arch
   let arch = '';
-  if (combined.includes('arm64') || combined.includes('aarch64') || combined.includes('arm-64')) arch = 'ARM64';
-  else if (combined.includes('arm') || combined.includes('armhf')) arch = 'ARM';
-  else if (combined.includes('x86_64') || combined.includes('amd64') || combined.includes('win64') || combined.includes('x64') || combined.includes('64bit') || combined.includes('64-bit')) arch = 'x64';
-  else if (combined.includes('x86') || combined.includes('32bit') || combined.includes('win32') || combined.includes('i386') || combined.includes('i686') || combined.includes('32-bit')) arch = 'x86';
+  if      (combined.match(/arm64|aarch64|arm-64/)) arch = 'ARM64';
+  else if (combined.match(/\barm\b|armhf/))        arch = 'ARM';
+  else if (combined.match(/x86_64|amd64|win64|\bx64\b|64bit|64-bit/)) arch = 'x64';
+  else if (combined.match(/\bx86\b|32bit|win32|i386|i686|32-bit/))    arch = 'x86';
 
-  // Type detection
-  let type = '';
-  if (combined.includes('portable') || combined.includes('standalone')) type = 'Portable';
-  else if (lowerUrl.endsWith('.msi')) type = 'MSI';
-  else if (lowerUrl.endsWith('.exe')) type = 'Installer';
-  else if (lowerUrl.endsWith('.zip') || lowerUrl.endsWith('.7z')) type = 'Portable';
-  else if (lowerUrl.endsWith('.msix') || lowerUrl.endsWith('.msixbundle')) type = 'MSIX';
-
-  // Version extraction
+  // ── Version
   let version: string | undefined;
-  const versionMatch = combined.match(/v?(\d+\.\d+(\.\d+)?(\.\d+)?)/);
-  if (versionMatch) version = versionMatch[1];
+  const vm = url.match(/v?(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)/);
+  if (vm) version = vm[1];
 
-  // Confidence score
-  let confidence = 0.5;
-  if (lowerUrl.endsWith('.exe') || lowerUrl.endsWith('.dmg') || lowerUrl.endsWith('.apk')) confidence += 0.2;
-  if (lowerText.includes('download')) confidence += 0.1;
-  if (arch) confidence += 0.1;
+  // ── Confidence
+  let confidence = 0.55;
+  if ([...EXT_INSTALLER, ...EXT_MACOS, ...EXT_LINUX, ...EXT_MOBILE, ...EXT_ISO].some(e => urlNoQuery.endsWith(e))) confidence = 0.90;
+  else if ([...EXT_ARCHIVE, ...EXT_CODE].some(e => urlNoQuery.endsWith(e))) confidence = 0.75;
+  else if ([...EXT_IMAGE, ...EXT_DOCUMENT, ...EXT_FONT, ...EXT_MEDIA].some(e => urlNoQuery.endsWith(e))) confidence = 0.80;
+  if (CDN_PATTERNS.some(p => lowerUrl.includes(p))) confidence = Math.min(confidence + 0.08, 1.0);
+  if (arch) confidence = Math.min(confidence + 0.05, 1.0);
 
   const isLatest = combined.includes('latest') || combined.includes('stable') || combined.includes('current');
 
-  // Build human-readable label from parts
-  const parts = [os !== 'Windows' ? os : '', arch, type].filter(Boolean);
-  const label = parts.length > 0 ? parts.join(' ') : (type || os);
+  const parts = [os !== 'Windows' && os !== 'Any' ? os : '', arch, type].filter(Boolean);
+  const label = parts.join(' ') || type;
 
   return { url, os, arch, type, version, isLatest, confidence, label };
 }
 
+// ─── Scraper ──────────────────────────────────────────────────────────────────
+
+function isDirectFileUrl(href: string): boolean {
+  const lower = href.toLowerCase().split('?')[0];
+  return ALL_DIRECT_EXTS.some(ext => lower.endsWith(ext));
+}
+
+function isTrustedCdnUrl(href: string): boolean {
+  const lower = href.toLowerCase();
+  return CDN_PATTERNS.some(p => lower.includes(p));
+}
+
 async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<DownloadOption[]> {
-  if (depth > 2) return [];
+  if (depth > 1) return []; // max one level of following — and only for known safe patterns
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(pageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
         'Accept-Language': 'en-US,en;q=0.5'
       },
       signal: controller.signal,
@@ -140,130 +208,93 @@ async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<Down
     });
     clearTimeout(timeoutId);
 
+    // If the response itself is a file, return it directly
     const contentType = response.headers.get('content-type') || '';
     const contentDisposition = response.headers.get('content-disposition') || '';
-    const directTypes = [
+    const isBinaryContent = [
       'application/octet-stream', 'application/x-msdownload', 'application/x-msi',
       'application/zip', 'application/x-7z-compressed', 'application/x-rar-compressed',
       'application/x-apple-diskimage', 'application/x-iso9660-image',
-      'application/vnd.android.package-archive',
-    ];
-    if (directTypes.some(t => contentType.includes(t)) || contentDisposition.includes('attachment')) {
-      return [{ ...classifyDownloadLink(response.url, ''), label: response.url.split('/').pop()?.split('?')[0] || response.url }];
+      'application/vnd.android.package-archive', 'application/pdf',
+      'image/', 'audio/', 'video/', 'font/'
+    ].some(t => contentType.includes(t));
+    if (isBinaryContent || contentDisposition.includes('attachment')) {
+      const fname = contentDisposition.match(/filename[^;=\n]*=["']?([^"'\n;]+)/i)?.[1]
+                 || response.url.split('/').pop()?.split('?')[0]
+                 || response.url;
+      return [{ ...classifyDownloadLink(response.url, fname), label: fname }];
     }
 
     const html = await response.text();
     const $ = cheerio.load(html);
-
-    const downloadExtensions = [
-      '.exe', '.msi', '.msix', '.msixbundle', '.appx', '.appxbundle',
-      '.dmg', '.pkg',
-      '.deb', '.rpm', '.appimage', '.flatpak', '.snap',
-      '.apk', '.xapk',
-      '.zip', '.7z', '.rar', '.tar.gz', '.tgz', '.tar.bz2', '.tar.xz',
-      '.iso', '.img', '.bin',
-      '.run', '.sh'
-    ];
-
-    const downloadKeywords = [
-      'api/download', 'releases/download', 'download?os=', 'get.videolan.org',
-      'download.mozilla.org', '/dl/', '/download/', 'latest/download',
-      'download_latest', '?download=true', '&download=true', 'download.php',
-      'get-download', 'click-to-download', 'start-download', 'download-now',
-      'mirrors', 'sourceforge.net/projects/', 'sourceforge.net/p/'
-    ];
+    const baseUrl = response.url;
 
     const links: DownloadOption[] = [];
-    let bestPageLink: string | null = null;
-    let bestPageScore = -1;
+    const seen = new Set<string>();
 
-    const addLink = (href: string, text: string) => {
-      if (!href || href.startsWith('javascript:') || href.startsWith('#') || href.startsWith('mailto:')) return false;
-      const lowerHref = href.toLowerCase();
-      const isDirect = downloadExtensions.some(ext => lowerHref.split('?')[0].endsWith(ext)) ||
-                       downloadKeywords.some(kw => lowerHref.includes(kw));
-      if (isDirect) {
-        try {
-          const fullUrl = new URL(href, response.url).href;
-          if (!links.some(l => l.url === fullUrl)) {
-            links.push(classifyDownloadLink(fullUrl, text));
-          }
-        } catch (e) {}
-        return true;
-      }
+    const addLink = (href: string, text: string): boolean => {
+      if (!href || href.startsWith('javascript:') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+      try {
+        const full = new URL(href, baseUrl).href;
+        if (seen.has(full)) return true;
+        if (isDirectFileUrl(full) || isTrustedCdnUrl(full)) {
+          seen.add(full);
+          links.push(classifyDownloadLink(full, text));
+          return true;
+        }
+      } catch {}
       return false;
     };
 
-    $('a').each((_i, el) => {
-      const href = $(el).attr('href');
+    // ── Scan all <a> tags
+    $('a[href]').each((_i, el) => {
+      const href = $(el).attr('href') || '';
       const text = $(el).text().trim();
-      if (!href) return;
-      if (addLink(href, text)) return;
-
-      const lowerHref = href.toLowerCase();
-      const lowerText = text.toLowerCase();
-      const className = ($(el).attr('class') || '').toLowerCase();
-      const id = ($(el).attr('id') || '').toLowerCase();
-
-      let score = 0;
-      if (lowerText === 'download') score += 30;
-      if (lowerText.includes('download for windows')) score += 50;
-      if (lowerText.includes('download latest')) score += 40;
-      if (lowerText.includes('get ')) score += 10;
-      if (lowerHref.includes('download')) score += 20;
-      if (lowerHref.includes('windows') || lowerHref.includes('win64')) score += 15;
-      if (className.includes('download') || id.includes('download')) score += 15;
-      if (className.includes('btn') || className.includes('button')) score += 5;
-
-      if (score > bestPageScore && score >= 15) {
-        bestPageScore = score;
-        try { bestPageLink = new URL(href, response.url).href; } catch (e) {}
-      }
+      addLink(href, text);
     });
 
-    $('[data-url], [data-href]').each((_i, el) => {
-      const url = $(el).attr('data-url') || $(el).attr('data-href');
-      const text = $(el).text().trim();
-      if (url) addLink(url, text);
+    // ── data-url / data-href attributes (some download buttons use these)
+    $('[data-url],[data-href],[data-download]').each((_i, el) => {
+      const u = $(el).attr('data-url') || $(el).attr('data-href') || $(el).attr('data-download') || '';
+      addLink(u, $(el).text().trim());
     });
 
-    const urlRegex = /(?:https?:\/\/|^\/)[^\s'"]+?(?:\.exe|\.msi|\.dmg|\.zip|\.apk|\.pkg)(?:\?[^\s'"]*)?/gi;
-    const matches = html.match(urlRegex);
-    if (matches) {
-      for (const match of matches) addLink(match, '');
+    // ── Regex scan raw HTML for file URLs that might be in JS/JSON
+    const rawFileRegex = /["'](https?:\/\/[^"'<>\s]+?(?:\.exe|\.msi|\.msix|\.dmg|\.pkg|\.deb|\.rpm|\.appimage|\.apk|\.ipa|\.zip|\.7z|\.tar\.gz|\.iso|\.img|\.pdf|\.docx?|\.xlsx?|\.mp4|\.mp3|\.flac|\.ttf|\.otf|\.woff2?)(?:\?[^"'<>\s]*)?)["']/gi;
+    let m: RegExpExecArray | null;
+    while ((m = rawFileRegex.exec(html)) !== null) {
+      addLink(m[1], '');
     }
 
-    const metaRefresh = $('meta[http-equiv="refresh"]').attr('content');
-    if (metaRefresh) {
-      const parts = metaRefresh.split(/url=/i);
-      if (parts.length > 1) {
-        const refreshUrl = parts[1].replace(/['"]/g, '').trim();
-        addLink(refreshUrl, '');
-        if (links.length === 0 && depth < 2) {
+    // ── meta refresh — follow ONLY if it looks like a real file redirect (SourceForge etc.)
+    if (links.length === 0 && depth === 0) {
+      const metaRefresh = $('meta[http-equiv="refresh"]').attr('content');
+      if (metaRefresh) {
+        const urlPart = metaRefresh.split(/url=/i)[1]?.replace(/['"]/g, '').trim();
+        if (urlPart) {
           try {
-            const nestedLinks = await findDirectDownloadLinks(new URL(refreshUrl, response.url).href, depth + 1);
-            links.push(...nestedLinks);
-          } catch (e) {}
+            const refreshFull = new URL(urlPart, baseUrl).href;
+            // Only follow if the refresh target looks like a file or trusted CDN
+            if (isDirectFileUrl(refreshFull) || isTrustedCdnUrl(refreshFull)) {
+              addLink(refreshFull, '');
+            } else if (refreshFull.includes('sourceforge.net') || refreshFull.includes('mirror') || refreshFull.includes('dl.')) {
+              // Follow one level for known mirror patterns only
+              const nested = await findDirectDownloadLinks(refreshFull, depth + 1);
+              links.push(...nested.filter(l => !seen.has(l.url)));
+              nested.forEach(l => seen.add(l.url));
+            }
+          } catch {}
         }
       }
     }
 
-    $('iframe').each((_i, el) => {
-      const src = $(el).attr('src');
-      if (src) addLink(src, '');
-    });
+    if (links.length === 0) return [];
 
-    if (links.length > 0) {
-      const uniqueLinks = Array.from(new Map(links.map(l => [l.url, l])).values());
-      return uniqueLinks.sort((a, b) => b.confidence - a.confidence);
-    }
+    return Array.from(new Map(links.map(l => [l.url, l])).values())
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 15); // cap at 15 results
 
-    if (bestPageLink && depth < 2 && bestPageLink !== pageUrl && (bestPageLink as string).startsWith('http')) {
-      return await findDirectDownloadLinks(bestPageLink, depth + 1);
-    }
-
-    return [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
