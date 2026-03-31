@@ -43,6 +43,10 @@ public partial class App : Application
         // subsequent error — including startup failures — can be captured.
         ErrorReporter.Initialize();
 
+        // Register extended code-page encodings (e.g. CP1252) needed for
+        // fixing UTF-8 mojibake in copilot CLI output on .NET 5+.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
         base.OnStartup(e);
 
         // Stamp log immediately
