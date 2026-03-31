@@ -254,7 +254,7 @@ skipRemoveFiles:
 webview2Ok:
     SetOutPath "$INSTDIR"
     DetailPrint "Installing YCB Browser..."
-    File /r "publish\*"
+    File /r "YCB\publish\*"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     CreateDirectory "$SMPROGRAMS\YCB"
     CreateShortcut "$SMPROGRAMS\YCB\YCB App.lnk" "$INSTDIR\YCB.exe"
