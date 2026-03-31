@@ -519,6 +519,9 @@ public partial class MainWindow : Window
         // Inject Quick Download enhancer early — runs at document creation on every navigation
         if (_settings.QuickDownloadEnabled)
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(GetSearchEnhancerScript());
+
+        // Register network-level ad blocker (checks _settings.AdBlockerEnabled at request time)
+        SetupAdBlockerNetwork(webView);
         
         // Setup event handlers
         SetupWebViewEvents(webView, _tabs.Count - 1);
@@ -3135,6 +3138,73 @@ public partial class MainWindow : Window
             return System.Text.Encoding.UTF8.GetString(bytes);
         }
         catch { return raw; }
+    }
+
+    private static readonly string[] _adBlockDomains =
+    [
+        // Google Ads
+        "*://googlesyndication.com/*", "*://*.googlesyndication.com/*",
+        "*://doubleclick.net/*",       "*://*.doubleclick.net/*",
+        "*://googleadservices.com/*",  "*://*.googleadservices.com/*",
+        "*://pagead2.googlesyndication.com/*",
+        "*://adservice.google.com/*",  "*://*.adservice.google.*/*",
+        // Ad networks
+        "*://adnxs.com/*",             "*://*.adnxs.com/*",
+        "*://amazon-adsystem.com/*",   "*://*.amazon-adsystem.com/*",
+        "*://media.net/*",             "*://*.media.net/*",
+        "*://pubmatic.com/*",          "*://*.pubmatic.com/*",
+        "*://openx.net/*",             "*://*.openx.net/*",
+        "*://rubiconproject.com/*",    "*://*.rubiconproject.com/*",
+        "*://casalemedia.com/*",       "*://*.casalemedia.com/*",
+        "*://adsrvr.org/*",            "*://*.adsrvr.org/*",
+        "*://moatads.com/*",           "*://*.moatads.com/*",
+        "*://yieldmo.com/*",           "*://*.yieldmo.com/*",
+        "*://criteo.com/*",            "*://*.criteo.com/*",
+        "*://taboola.com/*",           "*://*.taboola.com/*",
+        "*://outbrain.com/*",          "*://*.outbrain.com/*",
+        "*://revcontent.com/*",        "*://*.revcontent.com/*",
+        "*://lijit.com/*",             "*://*.lijit.com/*",
+        "*://advertising.com/*",       "*://*.advertising.com/*",
+        "*://adtech.com/*",            "*://*.adtech.com/*",
+        "*://bidswitch.net/*",         "*://*.bidswitch.net/*",
+        "*://contextweb.com/*",        "*://*.contextweb.com/*",
+        "*://sharethrough.com/*",      "*://*.sharethrough.com/*",
+        "*://triplelift.com/*",        "*://*.triplelift.com/*",
+        "*://33across.com/*",          "*://*.33across.com/*",
+        // Trackers
+        "*://google-analytics.com/*",  "*://*.google-analytics.com/*",
+        "*://analytics.google.com/*",
+        "*://connect.facebook.net/*",
+        "*://hotjar.com/*",            "*://*.hotjar.com/*",
+        "*://mouseflow.com/*",         "*://*.mouseflow.com/*",
+        "*://mixpanel.com/*",          "*://*.mixpanel.com/*",
+        "*://segment.com/*",           "*://*.segment.io/*",
+        "*://amplitude.com/*",         "*://*.amplitude.com/*",
+        "*://clarity.ms/*",            "*://*.clarity.ms/*",
+        "*://scorecardresearch.com/*", "*://*.scorecardresearch.com/*",
+        "*://comscore.com/*",          "*://*.comscore.com/*",
+        "*://krxd.net/*",              "*://*.krxd.net/*",
+        "*://chartbeat.com/*",         "*://*.chartbeat.com/*",
+        "*://quantserve.com/*",        "*://*.quantserve.com/*",
+        "*://everesttech.net/*",       "*://*.everesttech.net/*",
+        // Error/session trackers
+        "*://sentry.io/*",             "*://*.sentry.io/*",
+        "*://bugsnag.com/*",           "*://*.bugsnag.com/*",
+        "*://logrocket.com/*",         "*://*.logrocket.com/*",
+        "*://fullstory.com/*",         "*://*.fullstory.com/*",
+    ];
+
+    private void SetupAdBlockerNetwork(WebView2 webView)
+    {
+        foreach (var pattern in _adBlockDomains)
+            webView.CoreWebView2.AddWebResourceRequestedFilter(pattern, CoreWebView2WebResourceContext.All);
+
+        webView.CoreWebView2.WebResourceRequested += (s, e) =>
+        {
+            if (!_settings.AdBlockerEnabled) return;
+            // Return an empty 200 response to silently swallow the request
+            e.Response = _webViewEnvironment!.CreateWebResourceResponse(null, 200, "OK", "");
+        };
     }
 
     private static string GetAdBlockerScript() => @"

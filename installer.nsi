@@ -233,9 +233,10 @@ Section "Install"
     nsExec::Exec 'taskkill /F /IM YCB.exe'
     nsExec::Exec 'taskkill /F /IM ycb-smartdl.exe'
     Sleep 1000
-    ; Only wipe files on reinstall — update and install leave existing files/AppData alone
-    ; AppData is NEVER touched during reinstall or install — only uninstall can remove it
-    StrCmp $ACTION_OPTION "reinstall" removeOldFiles skipRemoveFiles
+    ; Wipe install dir on reinstall OR update — AppData is never touched
+    StrCmp $ACTION_OPTION "reinstall" removeOldFiles checkUpdate
+checkUpdate:
+    StrCmp $ACTION_OPTION "update" removeOldFiles skipRemoveFiles
 removeOldFiles:
     RMDir /r "$INSTDIR"
 skipRemoveFiles:
