@@ -3268,6 +3268,55 @@ public partial class MainWindow : Window
         "*://cdn.rollbar.com/*",       "*://*.rollbar.com/*",
         "*://raygun.com/*",            "*://*.raygun.com/*",
         "*://az416426.vo.msecnd.net/*",
+        // Turtlecute adblock test domains
+        // Ads
+        "*://adtago.s3.amazonaws.com/*", "*://analyticsengine.s3.amazonaws.com/*",
+        "*://analytics.s3.amazonaws.com/*", "*://advice-ads.s3.amazonaws.com/*",
+        "*://adcolony.com/*", "*://*.adcolony.com/*",
+        // Analytics
+        "*://freshmarketer.com/*", "*://*.freshmarketer.com/*",
+        "*://*.luckyorange.net/*", "*://stats.wp.com/*",
+        "*://app.getsentry.com/*",
+        // Social trackers
+        "*://static.ads-twitter.com/*", "*://ads-api.twitter.com/*",
+        "*://*.ads-twitter.com/*",
+        "*://ads.linkedin.com/*", "*://analytics.pointdrive.linkedin.com/*",
+        "*://ads.pinterest.com/*", "*://log.pinterest.com/*", "*://trk.pinterest.com/*",
+        "*://events.reddit.com/*", "*://events.redditmedia.com/*",
+        "*://ads.youtube.com/*",
+        "*://ads-api.tiktok.com/*", "*://analytics.tiktok.com/*",
+        "*://ads-sg.tiktok.com/*", "*://analytics-sg.tiktok.com/*",
+        "*://business-api.tiktok.com/*", "*://ads.tiktok.com/*",
+        "*://log.byteoversea.com/*",
+        // Yahoo / Yandex / Unity
+        "*://analytics.yahoo.com/*", "*://geo.yahoo.com/*", "*://udcm.yahoo.com/*",
+        "*://analytics.query.yahoo.com/*", "*://partnerads.ysm.yahoo.com/*",
+        "*://log.fc.yahoo.com/*", "*://gemini.yahoo.com/*", "*://adtech.yahooinc.com/*",
+        "*://extmaps-api.yandex.net/*", "*://appmetrica.yandex.ru/*",
+        "*://adfstat.yandex.ru/*", "*://offerwall.yandex.net/*", "*://adfox.yandex.ru/*",
+        "*://auction.unityads.unity3d.com/*", "*://webview.unityads.unity3d.com/*",
+        "*://config.unityads.unity3d.com/*", "*://adserver.unityads.unity3d.com/*",
+        // OEM trackers
+        "*://iot-eu-logser.realme.com/*", "*://iot-logser.realme.com/*",
+        "*://bdapi-ads.realmemobile.com/*", "*://bdapi-in-ads.realmemobile.com/*",
+        "*://api.ad.xiaomi.com/*", "*://data.mistat.xiaomi.com/*",
+        "*://data.mistat.india.xiaomi.com/*", "*://data.mistat.rus.xiaomi.com/*",
+        "*://sdkconfig.ad.xiaomi.com/*", "*://sdkconfig.ad.intl.xiaomi.com/*",
+        "*://tracking.rus.miui.com/*",
+        "*://adsfs.oppomobile.com/*", "*://adx.ads.oppomobile.com/*",
+        "*://ck.ads.oppomobile.com/*", "*://data.ads.oppomobile.com/*",
+        "*://metrics.data.hicloud.com/*", "*://metrics2.data.hicloud.com/*",
+        "*://grs.hicloud.com/*", "*://logservice.hicloud.com/*",
+        "*://logservice1.hicloud.com/*", "*://logbak.hicloud.com/*",
+        "*://click.oneplus.cn/*", "*://open.oneplus.net/*",
+        "*://samsungads.com/*", "*://smetrics.samsung.com/*",
+        "*://nmetrics.samsung.com/*", "*://samsung-com.112.2o7.net/*",
+        "*://analytics-api.samsunghealthcn.com/*",
+        "*://iadsdk.apple.com/*", "*://metrics.icloud.com/*",
+        "*://metrics.mzstatic.com/*", "*://api-adservices.apple.com/*",
+        "*://books-analytics-events.apple.com/*",
+        "*://weather-analytics-events.apple.com/*",
+        "*://notes-analytics-events.apple.com/*",
     ];
 
     private string GetAdBlockerEarlyScript()
@@ -3368,45 +3417,81 @@ public partial class MainWindow : Window
   // Block sendBeacon (tracker fallback)
   try { navigator.sendBeacon = function() { return true; }; } catch(e) {}
 
-  // Block XMLHttpRequest to known tracker endpoints
+  // Comprehensive block list regex - matches all major ad/tracker/social/OEM domains
+  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|events\.reddit\.com|redditmedia\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)/i;
+
+  function isBlockedUrl(url) {
+    try { return BLOCK_RE.test(url); } catch(e) { return false; }
+  }
+
+  // Block XMLHttpRequest — abort blocked requests (causes onerror, not just silent drop)
   var _origOpen = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url) {
-    if (/google-analytics|doubleclick|googletagmanager|facebook\.com\/tr|hotjar|sentry\.io|bugsnag|rollbar|raygun|newrelic|nr-data\.net|clarity\.ms|amplitude|mixpanel|segment\.io|fullstory|logrocket|datadog/i.test(url)) {
-      this._blocked = true;
-      return;
-    }
+    this._blocked = isBlockedUrl(typeof url === 'string' ? url : '');
+    if (this._blocked) return;
     return _origOpen.apply(this, arguments);
   };
   var _origSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function(body) {
-    if (this._blocked) return;
+    if (this._blocked) { this.dispatchEvent(new Event('error')); return; }
     return _origSend.apply(this, arguments);
   };
 
-  // Block fetch to tracker endpoints
+  // Block fetch — REJECT (throw TypeError) so no-cors checks register as blocked
   var _origFetch = window.fetch;
   window.fetch = function(input, init) {
-    var url = (typeof input === 'string') ? input : (input && input.url) || '';
-    if (/google-analytics|doubleclick|googletagmanager|facebook\.com\/tr|hotjar|sentry\.io|bugsnag|rollbar|raygun|newrelic|nr-data\.net|clarity\.ms|amplitude|mixpanel|segment\.io|fullstory|logrocket|datadog/i.test(url)) {
-      return Promise.resolve(new Response('', { status: 200 }));
+    var url = (typeof input === 'string') ? input : (input && (input.url || String(input))) || '';
+    if (isBlockedUrl(url)) {
+      return Promise.reject(new TypeError('net::ERR_BLOCKED_BY_CLIENT'));
     }
     return _origFetch.apply(this, arguments);
   };
 
-  // Inject CSS EARLY (before any HTML is parsed) to hide Flash/plugin ad elements
-  // This must be in the early script so it takes effect before the page's visibility checks run
+  // Inject CSS EARLY — hide Flash/plugin ad elements AND cosmetic filter targets
   try {
     var __adCss = document.createElement('style');
     __adCss.textContent =
+      // Flash/plugin ads
       'object[type*=""shockwave""],embed[type*=""shockwave""],' +
       'object[type*=""flash""],embed[type*=""flash""],' +
       'object[data*=""banner""],embed[src*=""banner""],' +
       'object[data*=""/ads/""],embed[src*=""/ads/""],' +
       'object[data*=""advertising""],embed[src*=""advertising""]' +
       '{display:none!important;height:0!important;min-height:0!important;' +
+      'max-height:0!important;overflow:hidden!important;visibility:hidden!important;}' +
+      // Cosmetic filter targets (turtlecute + adblock-tester)
+      '#cts_test,.textads,.banner-ads,.banner_ads,.afs_ads,.ad-zone,.ad-space,.adsbox,' +
+      '.ad-unit,.ad-slot,.advertisement,.adsbygoogle,.ad-container,.ad-wrapper,.ad-banner,' +
+      '[id=""cts_test""],[class*=""banner-ads""],[class*=""ad-unit""]' +
+      '{display:none!important;height:0!important;min-height:0!important;' +
       'max-height:0!important;overflow:hidden!important;visibility:hidden!important;}';
     document.documentElement.appendChild(__adCss);
   } catch(e) {}
+
+  // Remove Flash/plugin elements from DOM immediately — prevents 'Plugin not supported' placeholder
+  function removeFlashElements(root) {
+    try {
+      root.querySelectorAll(
+        'object[type*=""shockwave""],embed[type*=""shockwave""],' +
+        'object[type*=""flash""],embed[type*=""flash""],' +
+        'object[data*=""banner""],embed[src*=""banner""]'
+      ).forEach(function(el) { try { el.remove(); } catch(e) {} });
+    } catch(e) {}
+  }
+  removeFlashElements(document.documentElement);
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(n) {
+        if (n.nodeType === 1) {
+          removeFlashElements(n);
+          if (/^(OBJECT|EMBED)$/i.test(n.tagName)) {
+            var t = n.type || ''; var d = n.data || n.src || n.getAttribute('data') || n.getAttribute('src') || '';
+            if (/shockwave|flash/i.test(t) || /banner/i.test(d)) try { n.remove(); } catch(e) {}
+          }
+        }
+      });
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();
 ";
     }
@@ -3498,6 +3583,9 @@ public partial class MainWindow : Window
     'div[id^=""taboola-""]',
     'div[id^=""outbrain-""]',
     '.taboola', '.outbrain', '.OUTBRAIN',
+    // Cosmetic filter classes (turtlecute test)
+    '.textads', '.banner-ads', '.banner_ads', '.afs_ads', '.ad-space', '.adsbox',
+    '#cts_test', '#ad_ctd',
     // Flash / plugin ad objects — hide even when file is blocked (no onerror on <object>/<embed>)
     'object[type*=""shockwave""]', 'embed[type*=""shockwave""]',
     'object[type*=""flash""]',    'embed[type*=""flash""]',
