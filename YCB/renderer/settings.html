@@ -376,7 +376,7 @@
         <div class="row">
           <div>
             <div class="row-title">VPN — India <span style="font-size:16px">🇮🇳</span></div>
-            <div class="row-desc">Routes browser traffic through an India proxy. Hides your real IP from websites. No encryption — browser only. Open a new tab after enabling.</div>
+            <div class="row-desc">Routes browser traffic through an India proxy. Hides your real IP from websites. No encryption — browser only. Restart YCB after toggling to apply.</div>
           </div>
           <button class="toggle" id="toggle-vpn"></button>
         </div>
@@ -696,9 +696,9 @@
       save('vpn_enabled', on ? 'on' : 'off');
       updateVpnUI(on, 'off');
       if (on)
-        showToast('VPN enabled 🇮🇳 — open a new tab to route through India');
+        showToast('VPN enabled 🇮🇳 — restart YCB for it to take effect');
       else
-        showToast('VPN disabled — open a new tab to restore direct connection');
+        showToast('VPN disabled — restart YCB to apply');
     });
   }
 
