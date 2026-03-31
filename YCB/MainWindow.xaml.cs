@@ -3517,22 +3517,80 @@ public partial class MainWindow : Window
 
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  // Hide images loaded from ad-related paths (banner image ads)
-  var AD_IMG_RE = /[/?=](ads?|advert(?:isement)?|banner|bnr|sponsor|promo|adserver|adimg)[/?=.]|\/(ads?|banners?|advertisements?|sponsors?|adserver|adimages?)\//i;
-  function hideAdImages(root) {
+  // Collapse ad element AND its parent container if it becomes empty
+  var HIDE_CSS = ';display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;overflow:hidden!important;max-height:0!important;';
+  function collapseAdElement(el) {
     try {
-      root.querySelectorAll('img[src],img[data-src]').forEach(function(img) {
-        var src = img.src || img.getAttribute('data-src') || '';
-        if (AD_IMG_RE.test(src)) { img.style.cssText += ';display:none!important;visibility:hidden!important'; }
-      });
+      el.style.cssText += HIDE_CSS;
+      // Walk up and collapse empty parents (up to 4 levels)
+      var parent = el.parentElement;
+      for (var i = 0; i < 4 && parent && parent !== document.body && parent !== document.documentElement; i++) {
+        var hasVisible = false;
+        for (var j = 0; j < parent.children.length; j++) {
+          var c = parent.children[j];
+          if (c !== el && c.offsetHeight > 0 && getComputedStyle(c).display !== 'none') {
+            hasVisible = true; break;
+          }
+        }
+        if (!hasVisible) {
+          parent.style.cssText += HIDE_CSS;
+          parent = parent.parentElement;
+        } else break;
+      }
     } catch(e) {}
   }
+
+  // Hide images loaded from ad-related paths (banner image ads)
+  var AD_IMG_RE = /[/?=](ads?|advert(?:isement)?|banner|bnr|sponsor|promo|adserver|adimg)[/?=.]|\/(ads?|banners?|advertisements?|sponsors?|adserver|adimages?)\//i;
+  function isAdSrc(src) { return src && (AD_IMG_RE.test(src) || /\/banners?\//i.test(src)); }
+
+  function processImage(img) {
+    var src = img.src || img.getAttribute('data-src') || '';
+    if (isAdSrc(src)) collapseAdElement(img);
+  }
+  function hideAdImages(root) {
+    try { root.querySelectorAll('img[src],img[data-src]').forEach(processImage); } catch(e) {}
+  }
+
+  // Collapse when blocked image errors or loads with no content
+  document.addEventListener('error', function(e) {
+    try {
+      var t = e.target;
+      if (t && (t.tagName === 'IMG' || t.tagName === 'EMBED' || t.tagName === 'OBJECT')) {
+        var src = t.src || t.data || t.getAttribute('data') || '';
+        if (isAdSrc(src)) collapseAdElement(t);
+      }
+    } catch(ex) {}
+  }, true);
+
+  document.addEventListener('load', function(e) {
+    try {
+      var t = e.target;
+      if (t && t.tagName === 'IMG') {
+        var src = t.src || '';
+        if (isAdSrc(src) && t.naturalWidth === 0 && t.naturalHeight === 0) collapseAdElement(t);
+        // Also collapse 1x1 tracking pixels
+        if (t.naturalWidth <= 1 && t.naturalHeight <= 1 && src) collapseAdElement(t);
+      }
+    } catch(ex) {}
+  }, true);
+
   hideAdImages(document);
   new MutationObserver(function(muts) {
     muts.forEach(function(m) {
-      m.addedNodes.forEach(function(n) { if (n.nodeType === 1) hideAdImages(n); });
+      m.addedNodes.forEach(function(n) { if (n.nodeType === 1) { hideAdImages(n); processImage.call && n.tagName === 'IMG' && processImage(n); } });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
+
+  // Inject CSS to ensure zero-height for collapsed ad containers
+  try {
+    var style = document.createElement('style');
+    style.textContent = [
+      '#ad,#ads,#advert,#advertisement,#ad-container,#ad-wrapper,#ad-banner,#ad-unit,#banner-ad,#bannerAd',
+      '[id^=""ad-""][id*=""banner""]','[class*=""ad-banner""]','[class*=""banner-ad""]'
+    ].join(',') + '{min-height:0!important;}';
+    (document.head || document.documentElement).appendChild(style);
+  } catch(e) {}
 })();
 ";
 
