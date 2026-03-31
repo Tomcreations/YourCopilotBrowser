@@ -29,8 +29,10 @@ Var RadioUninstall
 Var RadioSettings
 Var ChkRemoveAppData
 Var ChkAI
+Var ChkAISettings
 
 Page custom MenuPageCreate MenuPageLeave
+Page custom SettingsPageCreate SettingsPageLeave
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -81,7 +83,7 @@ existingMenu:
     Pop $RadioUpdate
     ${NSD_CreateLabel} 20u 112u 100% 12u "Installs latest version and keeps your AppData. (Recommended)"
     Pop $0
-    ${NSD_CreateRadioButton} 8u 128u 100% 12u "Settings"
+    ${NSD_CreateRadioButton} 8u 128u 100% 12u "Master Settings"
     Pop $RadioSettings
     ${NSD_CreateLabel} 20u 142u 100% 12u "Toggle AI and other options for your existing install without reinstalling."
     Pop $0
@@ -140,17 +142,8 @@ readRemoveAppData:
 setRemoveFlag:
     StrCpy $REMOVE_APPDATA "1"
 skipRemoveFlag:
-    ; Handle settings — do it now and quit before InstFiles page
-    StrCmp $ACTION_OPTION "settings" 0 checkUninstallNow
-    MessageBox MB_YESNO "Enable AI integration for your existing install?$\r$\nYes = Enable$\nNo = Disable" IDYES saveAIOn IDNO saveAIOff
-saveAIOn:
-    WriteRegStr HKLM "Software\YCB" "AIOption" "on"
-    Goto settingsSaved
-saveAIOff:
-    WriteRegStr HKLM "Software\YCB" "AIOption" "off"
-settingsSaved:
-    MessageBox MB_OK "Settings saved."
-    Quit
+    ; Settings handled on the next page — skip checkUninstall for settings
+    StrCmp $ACTION_OPTION "settings" leaveDone checkUninstallNow
 
 checkUninstallNow:
     ; Handle uninstall — do it now and quit before InstFiles page
@@ -182,6 +175,53 @@ setAIOff:
     StrCpy $AI_OPTION "off"
 
 leaveDone:
+FunctionEnd
+
+
+Function SettingsPageCreate
+    ; Only show this page when action = settings
+    StrCmp $ACTION_OPTION "settings" 0 skipSettings
+
+    nsDialogs::Create 1018
+    Pop $Dialog
+
+    GetDlgItem $0 $HWNDPARENT 1
+    SendMessage $0 ${WM_SETTEXT} 0 "STR:Save"
+
+    ${NSD_CreateLabel} 0 0 100% 14u "YCB Browser — Master Settings"
+    Pop $0
+    ${NSD_CreateLabel} 0 18u 100% 10u "Adjust settings for your existing installation:"
+    Pop $0
+
+    ; AI integration checkbox — pre-check based on current registry value
+    ReadRegStr $1 HKLM "Software\YCB" "AIOption"
+    ${NSD_CreateCheckbox} 8u 38u 100% 14u "Enable built-in AI (GitHub Copilot) integration"
+    Pop $ChkAISettings
+    StrCmp $1 "off" settingsPageDone checkAIOn
+checkAIOn:
+    ${NSD_Check} $ChkAISettings
+
+settingsPageDone:
+    ; Auto-save when Back is clicked — handled by SettingsPageLeave not being called on Back
+    nsDialogs::Show
+    Return
+
+skipSettings:
+    Abort
+FunctionEnd
+
+Function SettingsPageLeave
+    ; Save settings and quit (Next/Save clicked)
+    ${NSD_GetState} $ChkAISettings $0
+    StrCmp $0 1 saveOn saveOff
+saveOn:
+    WriteRegStr HKLM "Software\YCB" "AIOption" "on"
+    Goto saved
+saveOff:
+    WriteRegStr HKLM "Software\YCB" "AIOption" "off"
+saved:
+    MessageBox MB_OK "Settings saved."
+    Quit
 FunctionEnd
 
 Section "Install"

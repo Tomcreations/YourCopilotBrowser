@@ -13,7 +13,7 @@ app.use(express.json());
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-YCB-Client');
   next();
 });
 app.options('*', (_req, res) => res.sendStatus(204));
@@ -104,6 +104,18 @@ const CDN_PATTERNS = [
   'download.gimp.org',
   'download.kde.org',
   'ftp.mozilla.org',
+  'objects.githubusercontent.com', // GitHub release assets
+  'github-releases.githubusercontent.com',
+  'releases.hashicorp.com',
+  'download.jetbrains.com',
+  'download.oracle.com',
+  'nodejs.org/dist/',
+  'registry.npmjs.org',
+  'pypi.org/packages/',
+  'dl.discordapp.net',
+  'cdn.discordapp.com',
+  'download.docker.com',
+  'update.code.visualstudio.com',
 ];
 
 // ─── Classifier ───────────────────────────────────────────────────────────────
@@ -251,16 +263,41 @@ async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<Down
     const html = await response.text();
     const $ = cheerio.load(html);
     const baseUrl = response.url;
+    const baseHost = new URL(baseUrl).hostname.replace(/^www\./, '');
 
     const links: DownloadOption[] = [];
     const seen = new Set<string>();
+
+    // Domains that are definitely NOT download sources (social, search, general web)
+    const NON_DOWNLOAD_DOMAINS = [
+      'facebook.com', 'twitter.com', 'x.com', 'instagram.com', 'linkedin.com',
+      'reddit.com', 'youtube.com', 'tiktok.com', 'pinterest.com',
+      'google.com', 'bing.com', 'yahoo.com', 'duckduckgo.com',
+      'wikipedia.org', 'amazon.com', 'ebay.com',
+    ];
 
     const addLink = (href: string, text: string): boolean => {
       if (!href || href.startsWith('javascript:') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return false;
       try {
         const full = new URL(href, baseUrl).href;
         if (seen.has(full)) return true;
+
+        // Skip links to non-download domains
+        const linkHost = new URL(full).hostname.replace(/^www\./, '');
+        if (NON_DOWNLOAD_DOMAINS.some(d => linkHost.includes(d))) return false;
+
         if (isDirectFileUrl(full) || isTrustedCdnUrl(full)) {
+          // Skip tiny site assets: favicons, icons, logos, tracking pixels
+          const fname = full.split('/').pop()?.split('?')[0]?.toLowerCase() || '';
+          if (/^(favicon|icon|logo|pixel|tracker|badge|button|banner|sprite|thumb)/i.test(fname)) return false;
+          // Skip image files that are likely page assets, not downloads
+          const isImage = EXT_IMAGE.some(e => fname.endsWith(e));
+          if (isImage) {
+            // Only include images if link text suggests it's a download
+            const ltext = text.toLowerCase();
+            if (!ltext.includes('download') && !ltext.includes('save') && !ltext.includes('get')) return false;
+          }
+
           seen.add(full);
           links.push(classifyDownloadLink(full, text));
           return true;
@@ -269,7 +306,7 @@ async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<Down
       return false;
     };
 
-    // ── Scan all <a> tags
+    // ── Scan all <a> tags — prioritize links whose text suggests a download
     $('a[href]').each((_i, el) => {
       const href = $(el).attr('href') || '';
       const text = $(el).text().trim();
@@ -287,6 +324,17 @@ async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<Down
     let m: RegExpExecArray | null;
     while ((m = rawFileRegex.exec(html)) !== null) {
       addLink(m[1], '');
+    }
+
+    // ── Follow GitHub repo pages to their releases page
+    if (links.length === 0 && depth === 0) {
+      const ghMatch = baseUrl.match(/^https?:\/\/github\.com\/([^\/]+\/[^\/]+)\/?$/);
+      if (ghMatch) {
+        const releasesUrl = `https://github.com/${ghMatch[1]}/releases/latest`;
+        const nested = await findDirectDownloadLinks(releasesUrl, depth + 1);
+        links.push(...nested.filter(l => !seen.has(l.url)));
+        nested.forEach(l => seen.add(l.url));
+      }
     }
 
     // ── meta refresh — follow ONLY if it looks like a real file redirect (SourceForge etc.)
@@ -313,7 +361,12 @@ async function findDirectDownloadLinks(pageUrl: string, depth = 0): Promise<Down
 
     if (links.length === 0) return [];
 
-    return Array.from(new Map(links.map(l => [l.url, l])).values())
+    // Filter out low-confidence results
+    const MIN_CONFIDENCE = 0.65;
+    const filtered = links.filter(l => l.confidence >= MIN_CONFIDENCE);
+    if (filtered.length === 0) return [];
+
+    return Array.from(new Map(filtered.map(l => [l.url, l])).values())
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, 15); // cap at 15 results
 

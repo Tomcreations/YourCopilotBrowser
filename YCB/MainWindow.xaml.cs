@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -2852,16 +2853,19 @@ public partial class MainWindow : Window
         if (imagePath != null)
         {
             var userText = string.IsNullOrEmpty(message) ? "Describe everything you see in this image." : message;
-            var imagePrompt = $"{imagePath}\n{userText}";
+            var imagePrompt = $"Please view this image: {imagePath}\nThe above line is ONLY the image file path — do not mention the path in your response, it is just so you can load the image. Do not describe or narrate what actions you are taking. Just directly answer: {userText}";
             
             var responseBorder2 = new Border
             {
                 Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#24263a")!),
-                CornerRadius = new CornerRadius(14, 14, 14, 3),
+                CornerRadius = new CornerRadius(18),
                 Padding = new Thickness(13, 10, 13, 10),
                 Margin = new Thickness(0, 5, 40, 5),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                MaxWidth = 280
+                MaxWidth = 280,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!),
+                BorderThickness = new Thickness(2, 0, 0, 0),
+                Opacity = 0.7
             };
             _currentResponseBlock = new TextBlock
             {
@@ -2879,34 +2883,40 @@ public partial class MainWindow : Window
                 var si = new ProcessStartInfo
                 {
                     FileName = copilotExe,
-                    Arguments = $"-p \"{imagePrompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-5-mini"} -s --no-ask-user --stream on --allow-all-paths",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true,
                     CreateNoWindow = true
                 };
+                si.ArgumentList.Add("-p");
+                si.ArgumentList.Add(imagePrompt);
+                si.ArgumentList.Add("--model");
+                si.ArgumentList.Add(_settings.YcbModel ?? "gpt-5-mini");
+                si.ArgumentList.Add("-s");
+                si.ArgumentList.Add("--no-ask-user");
+                si.ArgumentList.Add("--allow-all-paths");
                 _copilotProcess = new Process { StartInfo = si };
-                var fr = new System.Text.StringBuilder();
-                _copilotProcess.OutputDataReceived += (s2, a2) =>
-                {
-                    if (a2.Data != null)
-                    {
-                        if (fr.Length > 0) fr.AppendLine();
-                        fr.Append(a2.Data);
-                        Dispatcher.Invoke(() => { if (_currentResponseBlock != null) { _currentResponseBlock.Text = fr.ToString(); CopilotMessages.ScrollToEnd(); } });
-                    }
-                };
-                _copilotProcess.Exited += (s2, a2) => Dispatcher.Invoke(() =>
-                {
-                    CopilotInput.IsEnabled = true;
-                    if (!string.IsNullOrWhiteSpace(fr.ToString()))
-                        _chatHistory.Add(new ChatMessage { Role = "assistant", Content = fr.ToString() });
-                    _copilotProcess = null;
-                });
                 _copilotProcess.EnableRaisingEvents = true;
                 _copilotProcess.Start();
-                _copilotProcess.BeginOutputReadLine();
-                _copilotProcess.BeginErrorReadLine();
+                using var ms1 = new System.IO.MemoryStream();
+                await _copilotProcess.StandardOutput.BaseStream.CopyToAsync(ms1);
+                await _copilotProcess.WaitForExitAsync();
+                var frText = System.Text.Encoding.UTF8.GetString(ms1.ToArray()).Trim();
+                Dispatcher.Invoke(() =>
+                {
+                    if (_currentResponseBlock != null)
+                        _currentResponseBlock.Text = string.IsNullOrWhiteSpace(frText) ? "No response." : frText;
+                    if (_currentResponseBlock?.Parent is Border b2)
+                    {
+                        b2.CornerRadius = new CornerRadius(14, 14, 14, 3);
+                        b2.BorderThickness = new Thickness(0);
+                        b2.Opacity = 1.0;
+                    }
+                    CopilotInput.IsEnabled = true;
+                    if (!string.IsNullOrWhiteSpace(frText))
+                        _chatHistory.Add(new ChatMessage { Role = "assistant", Content = frText });
+                    _copilotProcess = null;
+                    CopilotMessages.ScrollToEnd();
+                });
             }
             catch (Exception ex)
             {
@@ -2922,11 +2932,14 @@ public partial class MainWindow : Window
         var responseBorder = new Border
         {
             Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#24263a")!),
-            CornerRadius = new CornerRadius(14, 14, 14, 3),
+            CornerRadius = new CornerRadius(18),
             Padding = new Thickness(13, 10, 13, 10),
             Margin = new Thickness(0, 5, 40, 5),
             HorizontalAlignment = HorizontalAlignment.Left,
-            MaxWidth = 280
+            MaxWidth = 280,
+            BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8ab4f8")!),
+            BorderThickness = new Thickness(2, 0, 0, 0),
+            Opacity = 0.7
         };
         
         _currentResponseBlock = new TextBlock
@@ -2946,75 +2959,49 @@ public partial class MainWindow : Window
             var startInfo = new ProcessStartInfo
             {
                 FileName = copilotExe,
-                Arguments = $"-p \"{prompt.Replace("\"", "\\\"")}\" --model {_settings.YcbModel ?? "gpt-5-mini"} -s --no-ask-user --stream on",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 CreateNoWindow = true
             };
+            startInfo.ArgumentList.Add("-p");
+            startInfo.ArgumentList.Add(prompt);
+            startInfo.ArgumentList.Add("--model");
+            startInfo.ArgumentList.Add(_settings.YcbModel ?? "gpt-5-mini");
+            startInfo.ArgumentList.Add("-s");
+            startInfo.ArgumentList.Add("--no-ask-user");
             
             _copilotProcess = new Process { StartInfo = startInfo };
-            var fullResponse = new System.Text.StringBuilder();
-            
-            _copilotProcess.OutputDataReceived += (s, args) =>
-            {
-                if (args.Data != null)
-                {
-                    if (fullResponse.Length > 0)
-                        fullResponse.AppendLine();
-                    fullResponse.Append(args.Data);
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (_currentResponseBlock != null)
-                        {
-                            _currentResponseBlock.Text = fullResponse.ToString();
-                            CopilotMessages.ScrollToEnd();
-                        }
-                    });
-                }
-            };
-            
-            _copilotProcess.ErrorDataReceived += (s, args) =>
-            {
-                if (args.Data != null && args.Data.ToLower().Contains("error"))
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (_currentResponseBlock != null)
-                        {
-                            _currentResponseBlock.Text = $"Error: {args.Data}";
-                            _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
-                        }
-                    });
-                }
-            };
-            
-            _copilotProcess.Exited += (s, args) =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    CopilotInput.IsEnabled = true;
-                    var response = fullResponse.ToString();
-                    if (!string.IsNullOrWhiteSpace(response))
-                    {
-                        _chatHistory.Add(new ChatMessage { Role = "assistant", Content = response });
-                        
-                        // Check for [OPEN_URL: ...] commands
-                        var urlMatches = System.Text.RegularExpressions.Regex.Matches(response, @"\[OPEN_URL:\s*(https?://[^\]]+)\]");
-                        foreach (System.Text.RegularExpressions.Match match in urlMatches)
-                        {
-                            var urlToOpen = match.Groups[1].Value.Trim();
-                            _ = CreateTab(urlToOpen);
-                        }
-                    }
-                    _copilotProcess = null;
-                });
-            };
-            
             _copilotProcess.EnableRaisingEvents = true;
             _copilotProcess.Start();
-            _copilotProcess.BeginOutputReadLine();
-            _copilotProcess.BeginErrorReadLine();
+            using var ms2 = new System.IO.MemoryStream();
+            await _copilotProcess.StandardOutput.BaseStream.CopyToAsync(ms2);
+            await _copilotProcess.WaitForExitAsync();
+            var response = System.Text.Encoding.UTF8.GetString(ms2.ToArray()).Trim();
+
+            Dispatcher.Invoke(() =>
+            {
+                CopilotInput.IsEnabled = true;
+                if (_currentResponseBlock != null)
+                    _currentResponseBlock.Text = string.IsNullOrWhiteSpace(response) ? "No response." : response;
+                if (_currentResponseBlock?.Parent is Border rb)
+                {
+                    rb.CornerRadius = new CornerRadius(14, 14, 14, 3);
+                    rb.BorderThickness = new Thickness(0);
+                    rb.Opacity = 1.0;
+                }
+                if (!string.IsNullOrWhiteSpace(response))
+                {
+                    _chatHistory.Add(new ChatMessage { Role = "assistant", Content = response });
+                    var urlMatches = System.Text.RegularExpressions.Regex.Matches(response, @"\[OPEN_URL:\s*(https?://[^\]]+)\]");
+                    foreach (System.Text.RegularExpressions.Match match in urlMatches)
+                    {
+                        var urlToOpen = match.Groups[1].Value.Trim();
+                        _ = CreateTab(urlToOpen);
+                    }
+                }
+                _copilotProcess = null;
+                CopilotMessages.ScrollToEnd();
+            });
         }
         catch (Exception ex)
         {
@@ -3123,6 +3110,20 @@ public partial class MainWindow : Window
             _currentResponseBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#f28b82")!);
         }
         finally { CopilotInput.IsEnabled = true; }
+    }
+
+    // The copilot CLI outputs UTF-8 bytes, but .NET reads them as the system default
+    // encoding (CP1252 on Windows), producing mojibake like â€" instead of —.
+    // Fix: re-encode the mis-decoded string back to CP1252 bytes, then decode as UTF-8.
+    private static string FixCopilotEncoding(string raw)
+    {
+        try
+        {
+            var cp1252 = System.Text.Encoding.GetEncoding(1252);
+            var bytes = cp1252.GetBytes(raw);
+            return System.Text.Encoding.UTF8.GetString(bytes);
+        }
+        catch { return raw; }
     }
 
     private string? FindCopilotExe()
@@ -3858,7 +3859,12 @@ public partial class MainWindow : Window
             Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(0, 0, 8, 0),
             Cursor = System.Windows.Input.Cursors.Hand
         };
-        freshBtn.Click += (s, e) => popup.Close();
+        freshBtn.Click += (s, e) =>
+        {
+            _settings.LastTabs = null;
+            SaveSettings();
+            popup.Close();
+        };
 
         var restoreBtn = new Button
         {
@@ -4356,10 +4362,9 @@ public partial class MainWindow : Window
         catch { return false; }
     }
 
-    private static string GetSearchEnhancerScript() => """
+    private static string GetSearchEnhancerScript() => $$"""
 (function() {
   'use strict';
-  // Bail out fast on non-search pages — script is registered on all tabs
   var _h = location.hostname, _p = location.pathname, _q = location.search;
   var _ok = (_h.includes('google.') && _p.includes('/search') && _q.includes('q=')) ||
             (_h.includes('bing.com') && _q.includes('q=')) ||
@@ -4382,9 +4387,9 @@ public partial class MainWindow : Window
 
   function renderResult(row, links) {
     row.innerHTML = '';
+    row.style.color = '#70757a';
     if (!links.length) {
-      row.style.color = '#bdc1c6';
-      row.textContent = 'No download links found';
+      row.remove();
       return;
     }
     var icon = document.createElement('span');
@@ -4633,7 +4638,6 @@ public partial class MainWindow : Window
             var linksEl = doc.RootElement.GetProperty("downloadLinks");
             if (linksEl.GetArrayLength() == 0) return;
 
-            // Build link objects for injection
             var linkList = linksEl.EnumerateArray().Select(link =>
             {
                 var dlUrl = link.GetProperty("url").GetString() ?? "";
@@ -4793,6 +4797,7 @@ public class Settings
     public double? WindowHeight { get; set; }
     public string? WindowState { get; set; }
     public bool QuickDownloadEnabled { get; set; } = false;
+
 }
 
 public class HistoryItem
