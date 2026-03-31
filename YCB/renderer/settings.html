@@ -370,6 +370,28 @@
         </div>
       </div>
     </div>
+    <div class="section">
+      <div class="section-label">VPN</div>
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="row-title">VPN — India <span style="font-size:16px">🇮🇳</span></div>
+            <div class="row-desc">Routes browser traffic through an India proxy. Hides your real IP from websites. No encryption — browser only. Open a new tab after enabling.</div>
+          </div>
+          <button class="toggle" id="toggle-vpn"></button>
+        </div>
+        <div id="vpn-status-row" class="row" style="padding-top:0;border-top:none;gap:8px;flex-wrap:wrap">
+          <span id="vpn-status-badge" style="font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.07);color:var(--text2)">⬤ Inactive</span>
+          <span id="vpn-location-badge" style="font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(255,153,51,0.15);color:#ff9933;display:none">🇮🇳 India</span>
+        </div>
+        <div class="row" style="padding-top:0;border-top:none;flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="font-size:12px;color:var(--text2)">Custom proxy address (optional)</div>
+          <input type="text" id="vpn-proxy-input" placeholder="http://proxy.example.in:3128  or  socks5://host:port"
+            style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;outline:none" />
+          <div style="font-size:11px;color:var(--text2)">Leave blank to use the built-in India proxy pool. If the proxy is unreachable, pages may not load — this is expected for free proxies.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- About -->
@@ -648,6 +670,47 @@
     });
   }
 
+  // ── VPN beta toggle ───────────────────────────────────────────────────────
+  const vpnToggle = document.getElementById('toggle-vpn');
+  const vpnStatusBadge = document.getElementById('vpn-status-badge');
+  const vpnLocationBadge = document.getElementById('vpn-location-badge');
+  const vpnProxyInput = document.getElementById('vpn-proxy-input');
+
+  function updateVpnUI(on, active) {
+    if (vpnStatusBadge) {
+      vpnStatusBadge.textContent = on ? (active === 'on' ? '⬤ Active' : '⬤ Connecting…') : '⬤ Inactive';
+      vpnStatusBadge.style.background = on ? (active === 'on' ? 'rgba(129,201,149,0.15)' : 'rgba(255,193,7,0.15)') : 'rgba(255,255,255,0.07)';
+      vpnStatusBadge.style.color = on ? (active === 'on' ? '#81c995' : '#ffc107') : 'var(--text2)';
+    }
+    if (vpnLocationBadge) vpnLocationBadge.style.display = on ? 'inline-flex' : 'none';
+  }
+
+  if (vpnToggle) {
+    const vpnOn = load('vpn_enabled', 'off') === 'on';
+    vpnToggle.classList.toggle('on', vpnOn);
+    updateVpnUI(vpnOn, vpnOn ? 'on' : 'off');
+
+    vpnToggle.addEventListener('click', () => {
+      const on = !vpnToggle.classList.contains('on');
+      vpnToggle.classList.toggle('on', on);
+      save('vpn_enabled', on ? 'on' : 'off');
+      updateVpnUI(on, 'off');
+      if (on)
+        showToast('VPN enabled 🇮🇳 — open a new tab to route through India');
+      else
+        showToast('VPN disabled — open a new tab to restore direct connection');
+    });
+  }
+
+  if (vpnProxyInput) {
+    vpnProxyInput.value = load('vpn_proxy_address', '');
+    vpnProxyInput.addEventListener('change', () => {
+      const val = vpnProxyInput.value.trim();
+      save('vpn_proxy_address', val);
+      showToast('Proxy address saved — re-enable VPN to apply');
+    });
+  }
+
   // ── Load settings from C# backend ────────────────────────────────────────
   window.loadSettings = function(data) {
     if (!data) return;
@@ -728,6 +791,13 @@
       const on = data.ad_blocker_enabled === 'on';
       adBlockToggle.classList.toggle('on', on);
       localStorage.setItem('ad_blocker_enabled', data.ad_blocker_enabled);
+    }
+    // vpn_enabled
+    if (data.vpn_enabled !== undefined && vpnToggle) {
+      const on = data.vpn_enabled === 'on';
+      vpnToggle.classList.toggle('on', on);
+      localStorage.setItem('vpn_enabled', data.vpn_enabled);
+      updateVpnUI(on, data.vpn_active || 'off');
     }
 
   };

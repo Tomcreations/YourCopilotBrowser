@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -53,6 +55,21 @@ public partial class MainWindow : Window
     private readonly Dictionary<WebView2, DateTime> _navStartTimes = new();
     private CoreWebView2Environment? _webViewEnvironment;
     private CoreWebView2Environment? _incognitoWebViewEnvironment;
+    // ── VPN Proxy ─────────────────────────────────────────────────────────────
+    private TcpListener? _vpnListener;
+    private CancellationTokenSource _vpnCts = new();
+    private string? _activeVpnProxy;
+    private const int VPN_LOCAL_PORT = 9799;
+    // Free India proxy pool — rotated at startup; beta users may need to provide their own
+    private static readonly string[] _indiaProxyPool =
+    [
+        "http://103.148.55.180:8080",
+        "http://103.76.186.189:3128",
+        "http://103.46.233.73:8080",
+        "http://117.247.109.210:8080",
+        "http://49.204.138.106:8080",
+        "http://45.64.91.77:3128",
+    ];
     private string? _attachedImagePath;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private WindowState _savedWindowState;
@@ -162,6 +179,10 @@ public partial class MainWindow : Window
         // Quick Download: start local server if enabled
         if (_settings.QuickDownloadEnabled)
             StartDlServer();
+
+        // VPN: start local India proxy if enabled
+        if (_settings.VpnEnabled)
+            StartVpnProxy();
         
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
@@ -505,12 +526,12 @@ public partial class MainWindow : Window
         var dataFolder = _isIncognito ? _incognitoUserDataFolder : _userDataFolder;
         if (_isIncognito)
         {
-            _incognitoWebViewEnvironment ??= await CoreWebView2Environment.CreateAsync(null, dataFolder);
+            _incognitoWebViewEnvironment ??= await CreateWebViewEnvironment(dataFolder);
             await webView.EnsureCoreWebView2Async(_incognitoWebViewEnvironment);
         }
         else
         {
-            _webViewEnvironment ??= await CoreWebView2Environment.CreateAsync(null, dataFolder);
+            _webViewEnvironment ??= await CreateWebViewEnvironment(dataFolder);
             await webView.EnsureCoreWebView2Async(_webViewEnvironment);
         }
         
@@ -1340,7 +1361,9 @@ public partial class MainWindow : Window
                             user_id = ErrorReporter.UserId,
                             ai_enabled = _aiEnabled ? "on" : "off",
                             quick_download_enabled = _settings.QuickDownloadEnabled ? "on" : "off",
-                            ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off"
+                            ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off",
+                            vpn_enabled = _settings.VpnEnabled ? "on" : "off",
+                            vpn_active = (_settings.VpnEnabled && _activeVpnProxy != null) ? "on" : "off"
                         };
                         var settingsDataJson = JsonSerializer.Serialize(settingsData);
                         await webView.ExecuteScriptAsync($"window.loadSettings && window.loadSettings({settingsDataJson})");
@@ -3531,6 +3554,176 @@ public partial class MainWindow : Window
 ";
     }
 
+    // ── VPN / India Proxy ─────────────────────────────────────────────────────
+
+    private async Task<CoreWebView2Environment> CreateWebViewEnvironment(string dataFolder)
+    {
+        if (_settings.VpnEnabled)
+        {
+            var opts = new CoreWebView2EnvironmentOptions(
+                $"--proxy-server=http://127.0.0.1:{VPN_LOCAL_PORT} " +
+                "--proxy-bypass-list=<-loopback>;ycb://*;localhost;127.0.0.1");
+            return await CoreWebView2Environment.CreateAsync(null, dataFolder, opts);
+        }
+        return await CoreWebView2Environment.CreateAsync(null, dataFolder);
+    }
+
+    private void StartVpnProxy()
+    {
+        _vpnCts?.Cancel();
+        _vpnCts = new CancellationTokenSource();
+        var ct = _vpnCts.Token;
+        Task.Run(async () =>
+        {
+            var pool = _settings.VpnProxyAddress is { Length: > 0 } custom
+                ? [custom]
+                : _indiaProxyPool;
+            _activeVpnProxy = await FindWorkingProxyAsync(pool, ct);
+            try
+            {
+                _vpnListener = new TcpListener(IPAddress.Loopback, VPN_LOCAL_PORT);
+                _vpnListener.Start();
+                while (!ct.IsCancellationRequested)
+                {
+                    var client = await _vpnListener.AcceptTcpClientAsync(ct);
+                    _ = Task.Run(() => HandleVpnClientAsync(client, _activeVpnProxy, ct), ct);
+                }
+            }
+            catch { }
+        }, ct);
+    }
+
+    private void StopVpnProxy()
+    {
+        _vpnCts?.Cancel();
+        _vpnListener?.Stop();
+        _vpnListener = null;
+        _activeVpnProxy = null;
+    }
+
+    private static async Task<string?> FindWorkingProxyAsync(string[] proxies, CancellationToken ct)
+    {
+        foreach (var proxy in proxies)
+        {
+            try
+            {
+                var uri = new Uri(proxy);
+                using var tcp = new TcpClient();
+                var connectTask = tcp.ConnectAsync(uri.Host, uri.Port, ct).AsTask();
+                if (await Task.WhenAny(connectTask, Task.Delay(3000, ct)) == connectTask && !connectTask.IsFaulted)
+                    return proxy;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private static async Task HandleVpnClientAsync(TcpClient client, string? upstream, CancellationToken ct)
+    {
+        using (client)
+        {
+            client.ReceiveTimeout = 15000;
+            client.SendTimeout = 15000;
+            try
+            {
+                using var cStream = client.GetStream();
+                var buf = new byte[65536];
+                int n = await cStream.ReadAsync(buf, 0, buf.Length, ct);
+                if (n == 0) return;
+                var header = Encoding.ASCII.GetString(buf, 0, n);
+
+                if (header.StartsWith("CONNECT ", StringComparison.OrdinalIgnoreCase))
+                {
+                    // HTTPS CONNECT tunnel
+                    var target = header.Split(' ')[1].Trim();
+                    var hp = target.Split(':');
+                    var host = hp[0];
+                    int port = hp.Length > 1 && int.TryParse(hp[1], out int p) ? p : 443;
+
+                    TcpClient? up = null;
+                    Stream? upStream = null;
+
+                    if (upstream != null)
+                    {
+                        var upUri = new Uri(upstream);
+                        up = new TcpClient();
+                        await up.ConnectAsync(upUri.Host, upUri.Port, ct);
+                        upStream = up.GetStream();
+                        var msg = $"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\nProxy-Connection: keep-alive\r\n\r\n";
+                        await upStream.WriteAsync(Encoding.ASCII.GetBytes(msg), ct);
+                        var rb = new byte[1024];
+                        int rn = await upStream.ReadAsync(rb, 0, rb.Length, ct);
+                        if (!Encoding.ASCII.GetString(rb, 0, rn).Contains("200")) { up.Dispose(); return; }
+                    }
+                    else
+                    {
+                        // No upstream — direct connection (fallback, reveals real IP)
+                        up = new TcpClient();
+                        await up.ConnectAsync(host, port, ct);
+                        upStream = up.GetStream();
+                    }
+
+                    using (up)
+                    {
+                        await cStream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), ct);
+                        await Task.WhenAny(
+                            VpnPipeAsync(cStream, upStream, ct),
+                            VpnPipeAsync(upStream, cStream, ct));
+                    }
+                }
+                else
+                {
+                    // HTTP request — forward via upstream
+                    var firstLine = header.Split('\n')[0].Trim();
+                    var parts = firstLine.Split(' ');
+                    if (parts.Length < 2 || !parts[1].StartsWith("http")) return;
+
+                    using var handler = new HttpClientHandler
+                    {
+                        AllowAutoRedirect = false,
+                        UseProxy = upstream != null,
+                        Proxy = upstream != null ? new WebProxy(upstream) : null
+                    };
+                    using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+                    var req = new HttpRequestMessage(new HttpMethod(parts[0]), parts[1]);
+                    foreach (var line in header.Split('\n').Skip(1))
+                    {
+                        var t = line.Trim();
+                        if (t.Length == 0) break;
+                        var ci = t.IndexOf(':');
+                        if (ci < 0) continue;
+                        var k = t[..ci].Trim();
+                        var v = t[(ci + 1)..].Trim();
+                        if (k.Equals("Host", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (k.StartsWith("Proxy-", StringComparison.OrdinalIgnoreCase)) continue;
+                        try { req.Headers.TryAddWithoutValidation(k, v); } catch { }
+                    }
+                    var resp = await httpClient.SendAsync(req, ct);
+                    var body = await resp.Content.ReadAsByteArrayAsync(ct);
+                    var respHeader = $"HTTP/1.1 {(int)resp.StatusCode} {resp.ReasonPhrase}\r\n";
+                    foreach (var h in resp.Headers.Concat(resp.Content.Headers))
+                        respHeader += $"{h.Key}: {string.Join(", ", h.Value)}\r\n";
+                    respHeader += $"Content-Length: {body.Length}\r\n\r\n";
+                    await cStream.WriteAsync(Encoding.ASCII.GetBytes(respHeader), ct);
+                    await cStream.WriteAsync(body, ct);
+                }
+            }
+            catch { }
+        }
+    }
+
+    private static async Task VpnPipeAsync(Stream src, Stream dst, CancellationToken ct)
+    {
+        var buf = new byte[16384];
+        try
+        {
+            int n;
+            while ((n = await src.ReadAsync(buf, ct)) > 0)
+                await dst.WriteAsync(buf.AsMemory(0, n), ct);
+        }
+        catch { }
+    }
+
     private void SetupAdBlockerNetwork(WebView2 webView)
     {
         foreach (var pattern in _adBlockDomains)
@@ -4924,6 +5117,25 @@ public partial class MainWindow : Window
                 SaveSettings();
                 UpdateAdBlockButton();
                 break;
+
+            case "vpn_enabled":
+                _settings.VpnEnabled = value == "on";
+                SaveSettings();
+                // VPN requires environment recreation — show restart notice
+                // Immediately start/stop proxy for next new tab
+                if (_settings.VpnEnabled)
+                    StartVpnProxy();
+                else
+                    StopVpnProxy();
+                // Reset cached environments so next tab picks up new proxy
+                _webViewEnvironment = null;
+                _incognitoWebViewEnvironment = null;
+                break;
+
+            case "vpn_proxy_address":
+                _settings.VpnProxyAddress = string.IsNullOrWhiteSpace(value) ? null : value;
+                SaveSettings();
+                break;
         }
     }
     
@@ -5441,6 +5653,8 @@ public class Settings
     public bool QuickDownloadEnabled { get; set; } = false;
     public bool AdBlockerEnabled { get; set; } = false;
     public List<string>? AdBlockerDisabledSites { get; set; }
+    public bool VpnEnabled { get; set; } = false;
+    public string? VpnProxyAddress { get; set; }
 
 }
 
