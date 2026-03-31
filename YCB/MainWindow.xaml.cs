@@ -3392,6 +3392,21 @@ public partial class MainWindow : Window
     }
     return _origFetch.apply(this, arguments);
   };
+
+  // Inject CSS EARLY (before any HTML is parsed) to hide Flash/plugin ad elements
+  // This must be in the early script so it takes effect before the page's visibility checks run
+  try {
+    var __adCss = document.createElement('style');
+    __adCss.textContent =
+      'object[type*=""shockwave""],embed[type*=""shockwave""],' +
+      'object[type*=""flash""],embed[type*=""flash""],' +
+      'object[data*=""banner""],embed[src*=""banner""],' +
+      'object[data*=""/ads/""],embed[src*=""/ads/""],' +
+      'object[data*=""advertising""],embed[src*=""advertising""]' +
+      '{display:none!important;height:0!important;min-height:0!important;' +
+      'max-height:0!important;overflow:hidden!important;visibility:hidden!important;}';
+    document.documentElement.appendChild(__adCss);
+  } catch(e) {}
 })();
 ";
     }
