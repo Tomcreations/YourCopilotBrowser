@@ -3337,6 +3337,10 @@ public partial class MainWindow : Window
   }
 
   // All tracker globals set to undefined so typeof checks return 'undefined' → eval detects as blocked
+  // Turtlecute ad script test variables — pre-lock before ads.js/pagead.js can set them
+  def('s_test_ads', undefined); def('s_test_pagead', undefined);
+  def('s_test_analytics', undefined); def('s_test_tracker', undefined);
+
   // Google Analytics / GTM
   def('ga', undefined); def('gtag', undefined); def('_gaq', undefined);
   def('dataLayer', undefined); def('GoogleAnalyticsObject', undefined);
@@ -3418,7 +3422,7 @@ public partial class MainWindow : Window
   try { navigator.sendBeacon = function() { return true; }; } catch(e) {}
 
   // Comprehensive block list regex - matches all major ad/tracker/social/OEM domains
-  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|events\.reddit\.com|redditmedia\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)/i;
+  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|events\.reddit\.com|redditmedia\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|analytics\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)|\/pagead\.js|\/widget\/ads\.js|\/ads\.js\b|pagead2\.|adsbygoogle|advertising\.com|bidswitch\.net|contextweb\.com|sharethrough\.com|triplelift\.com|33across\.com|sovrn\.com|smartadserver\.com|teads\.(tv|com)|spotxchange\.com|spotx\.tv|undertone\.com|mediavine\.com|revcontent\.com|lijit\.com|adtech\.(com|de)|everesttech\.net|statcounter\.com|krxd\.net|quantcast\.com|adsymptotic\.com|serving-sys\.com|turn\.com|demdex\.net|bluekai\.com|exelator\.com|addthis\.com|sharethis\.com|disqus\.com\/count|livefyre\.com|apnxs\.com|adgrx\.com|lkqd\.net|freewheel\.tv|stickyadstv\.com|jwpltx\.com|jwpsrv\.com|advertising-api\.amazon/i;
 
   function isBlockedUrl(url) {
     try { return BLOCK_RE.test(url); } catch(e) { return false; }
@@ -3459,12 +3463,18 @@ public partial class MainWindow : Window
       'object[data*=""advertising""],embed[src*=""advertising""]' +
       '{display:none!important;height:0!important;min-height:0!important;' +
       'max-height:0!important;overflow:hidden!important;visibility:hidden!important;}' +
-      // Cosmetic filter targets (turtlecute + adblock-tester)
+      // Cosmetic filter targets — covers turtlecute cts_test and common ad containers
       '#cts_test,.textads,.banner-ads,.banner_ads,.afs_ads,.ad-zone,.ad-space,.adsbox,' +
       '.ad-unit,.ad-slot,.advertisement,.adsbygoogle,.ad-container,.ad-wrapper,.ad-banner,' +
-      '[id=""cts_test""],[class*=""banner-ads""],[class*=""ad-unit""]' +
+      '.adbox,.ADBox,.AdBox,.adbox-wrapper,.adSocial,' +
+      '[id=""cts_test""],[id=""ad_ctd""],[class*=""banner-ads""],[class*=""ad-unit""],' +
+      '[class*=""adsbox""],[class*=""adsbygoogle""],' +
+      'ins.adsbygoogle,ins[data-ad-slot],ins[data-ad-client],' +
+      '[data-ad-unit],[data-ad-slot],[data-ad-client]' +
       '{display:none!important;height:0!important;min-height:0!important;' +
-      'max-height:0!important;overflow:hidden!important;visibility:hidden!important;}';
+      'max-height:0!important;overflow:hidden!important;visibility:hidden!important;' +
+      'width:0!important;max-width:0!important;position:absolute!important;' +
+      'pointer-events:none!important;clip:rect(0,0,0,0)!important;}';
     document.documentElement.appendChild(__adCss);
   } catch(e) {}
 
@@ -3478,15 +3488,40 @@ public partial class MainWindow : Window
       ).forEach(function(el) { try { el.remove(); } catch(e) {} });
     } catch(e) {}
   }
+  // Remove dynamic ad test elements (e.g. turtlecute #ad_ctd, generic ad containers)
+  function removeAdElements(root) {
+    try {
+      root.querySelectorAll(
+        '#ad_ctd,[id=""ad_ctd""],.textads.banner-ads,.adsbox.banner_ads'
+      ).forEach(function(el) {
+        try {
+          // Zero out size so height checks fail
+          el.style.cssText = 'display:none!important;height:0!important;max-height:0!important;' +
+            'overflow:hidden!important;width:0!important;visibility:hidden!important;' +
+            'position:absolute!important;pointer-events:none!important;';
+        } catch(e) {}
+      });
+    } catch(e) {}
+  }
   removeFlashElements(document.documentElement);
+  removeAdElements(document.documentElement);
   new MutationObserver(function(muts) {
     muts.forEach(function(m) {
       m.addedNodes.forEach(function(n) {
         if (n.nodeType === 1) {
           removeFlashElements(n);
+          removeAdElements(n);
           if (/^(OBJECT|EMBED)$/i.test(n.tagName)) {
             var t = n.type || ''; var d = n.data || n.src || n.getAttribute('data') || n.getAttribute('src') || '';
             if (/shockwave|flash/i.test(t) || /banner/i.test(d)) try { n.remove(); } catch(e) {}
+          }
+          // Zero out any injected ad container by id/class
+          var id = n.id || ''; var cls = n.className || '';
+          if (/^ad_?ctd$|^cts_test$/i.test(id) || /\badsbox\b|\btextads\b|\bbanner.ads\b/i.test(cls)) {
+            try {
+              n.style.cssText = 'display:none!important;height:0!important;max-height:0!important;' +
+                'overflow:hidden!important;width:0!important;visibility:hidden!important;';
+            } catch(e) {}
           }
         }
       });
@@ -3510,6 +3545,15 @@ public partial class MainWindow : Window
             "*://*/adserver/*", "*://*/adimg/*", "*://*/adimages/*",
             "*://*/sponsor/*", "*://*/sponsors/*",
             "*://*ad-banner*", "*://*banner-ad*", "*://*adBanner*",
+            // Ad script files — block common ad/tracker script paths
+            "*://*/pagead.js*", "*://*/pagead2.js*",
+            "*://*/ads.js*", "*://*/widget/ads.js*",
+            "*://*/adsbygoogle.js*", "*://*/show_ads.js*",
+            "*://*/googletag.js*", "*://*/gpt.js*",
+            "*://*/analytics.js*", "*://*/ga.js*", "*://*/gtag.js*",
+            "*://*/pixel.js*", "*://*/fbevents.js*",
+            "*://*/hotjar*.js*", "*://*/mouseflow*.js*",
+            "*://*/adsense*", "*://*/doubleclick*",
         };
         foreach (var p in adImagePaths)
             webView.CoreWebView2.AddWebResourceRequestedFilter(p, CoreWebView2WebResourceContext.All);
