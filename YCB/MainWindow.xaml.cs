@@ -3482,9 +3482,14 @@ public partial class MainWindow : Window
     'script[src*=""doubleclick.net""]',
     'div[id^=""taboola-""]',
     'div[id^=""outbrain-""]',
-    '.taboola',
-    '.outbrain',
-    '.OUTBRAIN'
+    '.taboola', '.outbrain', '.OUTBRAIN',
+    // Flash / plugin ad objects — hide even when file is blocked (no onerror on <object>/<embed>)
+    'object[type*=""shockwave""]', 'embed[type*=""shockwave""]',
+    'object[type*=""flash""]',    'embed[type*=""flash""]',
+    'object[data*=""banner""]',   'embed[src*=""banner""]',
+    'object[data*=""/ads/""]',    'embed[src*=""/ads/""]',
+    'object[data*=""advertising""]', 'embed[src*=""advertising""]',
+    'object[data*=""advert""]',   'embed[src*=""advert""]'
   ].join(',');
 
   function removeAds(root) {
@@ -3548,8 +3553,15 @@ public partial class MainWindow : Window
     var src = img.src || img.getAttribute('data-src') || '';
     if (isAdSrc(src)) collapseAdElement(img);
   }
+  function processPlugin(el) {
+    var src = el.data || el.src || el.getAttribute('data') || el.getAttribute('src') || '';
+    if (isAdSrc(src) || /shockwave|flash/i.test(el.type || '')) collapseAdElement(el);
+  }
   function hideAdImages(root) {
-    try { root.querySelectorAll('img[src],img[data-src]').forEach(processImage); } catch(e) {}
+    try {
+      root.querySelectorAll('img[src],img[data-src]').forEach(processImage);
+      root.querySelectorAll('object[data],object[type],embed[src],embed[type]').forEach(processPlugin);
+    } catch(e) {}
   }
 
   // Collapse when blocked image errors or loads with no content
@@ -3578,17 +3590,26 @@ public partial class MainWindow : Window
   hideAdImages(document);
   new MutationObserver(function(muts) {
     muts.forEach(function(m) {
-      m.addedNodes.forEach(function(n) { if (n.nodeType === 1) { hideAdImages(n); processImage.call && n.tagName === 'IMG' && processImage(n); } });
+      m.addedNodes.forEach(function(n) {
+        if (n.nodeType === 1) {
+          hideAdImages(n);
+          if (n.tagName === 'IMG') processImage(n);
+          if (n.tagName === 'OBJECT' || n.tagName === 'EMBED') processPlugin(n);
+        }
+      });
     });
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  // Inject CSS to ensure zero-height for collapsed ad containers
+  // Inject CSS — hide Flash/plugin objects and ad containers early
   try {
     var style = document.createElement('style');
-    style.textContent = [
-      '#ad,#ads,#advert,#advertisement,#ad-container,#ad-wrapper,#ad-banner,#ad-unit,#banner-ad,#bannerAd',
-      '[id^=""ad-""][id*=""banner""]','[class*=""ad-banner""]','[class*=""banner-ad""]'
-    ].join(',') + '{min-height:0!important;}';
+    style.textContent =
+      'object[type*=""shockwave""],object[type*=""flash""],embed[type*=""shockwave""],embed[type*=""flash""],' +
+      'object[data*=""banner""],embed[src*=""banner""],object[data*=""/ads/""],embed[src*=""/ads/""],' +
+      'object[data*=""advertising""],embed[src*=""advertising""],' +
+      '#ad,#ads,#advert,#advertisement,#ad-container,#ad-wrapper,#ad-banner,#ad-unit,#banner-ad,' +
+      '[id^=""ad-""][id*=""banner""],[class*=""ad-banner""],[class*=""banner-ad""]' +
+      '{display:none!important;height:0!important;min-height:0!important;visibility:hidden!important;overflow:hidden!important;}';
     (document.head || document.documentElement).appendChild(style);
   } catch(e) {}
 })();
