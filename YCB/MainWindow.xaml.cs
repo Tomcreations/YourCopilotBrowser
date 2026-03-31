@@ -3663,6 +3663,196 @@ public partial class MainWindow : Window
         "*://gwiq.com/*",              "*://*.gwiq.com/*",
         "*://adsymptotic.com/*",       "*://*.adsymptotic.com/*",
         "*://nrich.ai/*",              "*://*.nrich.ai/*",
+
+        // ── More OEM Vendors ────────────────────────────────────────────
+        // Vivo
+        "*://analytics.vivo.com.cn/*", "*://sa.vivo.com.cn/*",
+        "*://tracking.vivo.com/*",     "*://log.vivo.com.cn/*",
+        "*://push.vivo.com.cn/*",      "*://adv.vivo.com.cn/*",
+        "*://cm.vivo.com.cn/*",        "*://analytics-sg.vivo.com/*",
+        // LG
+        "*://lganalytics.com/*",       "*://*.lganalytics.com/*",
+        "*://lge.com/analytics*",      "*://tracking.lge.com/*",
+        "*://ads.lge.com/*",           "*://stats.lge.com/*",
+        "*://lgtvsdp.com/*",           "*://*.lgtvsdp.com/*",
+        "*://lgsmartad.com/*",         "*://*.lgsmartad.com/*",
+        "*://smartshare.lgappstv.com/*","*://ibis.lgappstv.com/*",
+        // Motorola
+        "*://analytics.motorola.com/*","*://tracking.motorola.com/*",
+        "*://moto-analytics.com/*",    "*://*.moto-analytics.com/*",
+        "*://motorola-analytics.com/*","*://*.motog.motorola.com/ads/*",
+        // Sony
+        "*://sony-analytics.com/*",    "*://*.sony-analytics.com/*",
+        "*://analyticsservices.sony.com/*",
+        "*://ad.sonyentertainmentnetwork.com/*",
+        "*://ps-metrics.sonyentertainmentnetwork.com/*",
+        "*://tele.sonyentertainmentnetwork.com/*",
+        // Lenovo
+        "*://analytics.lenovo.com/*",  "*://track.lenovo.com/*",
+        "*://collector.lenovo.com/*",  "*://adv.lenovo.com/*",
+        "*://ads.lenovo.com/*",
+        // ASUS
+        "*://analytics.asus.com/*",    "*://tracking.asus.com/*",
+        "*://metrics.asus.com/*",      "*://ads.asus.com/*",
+        "*://splashads.asus.com/*",    "*://asus-splashads.com/*",
+        // Nokia / HMD Global
+        "*://analytics.hmdglobal.com/*","*://track.hmdglobal.com/*",
+        "*://nokia-analytics.com/*",   "*://*.nokia-analytics.com/*",
+        // HTC
+        "*://analytics.htc.com/*",     "*://tracking.htc.com/*",
+        "*://ads.htc.com/*",           "*://htcmetrics.com/*",
+        // Wiko
+        "*://analytics.wikozone.com/*","*://tracking.wiko.com/*",
+        // TCL
+        "*://analytics.tcl.com/*",     "*://track.tcl.com/*",
+        "*://ad.tcl.com/*",
+
+        // ── More Social Trackers (subdomains & variants) ─────────────────
+        // Facebook/Instagram
+        "*://connect.facebook.net/*",
+        "*://web.facebook.com/tr*",
+        "*://graph.instagram.com/*",
+        "*://i.instagram.com/*",
+        "*://pixel.facebook.com/*",
+        // Twitter/X
+        "*://analytics.twitter.com/*",
+        "*://t.co/i/*",
+        "*://platform.twitter.com/*",
+        "*://cdn.syndication.twimg.com/*",
+        "*://syndication.twitter.com/*",
+        // LinkedIn
+        "*://snap.licdn.com/*",
+        "*://px.ads.linkedin.com/*",
+        "*://dc.ads.linkedin.com/*",
+        "*://platform.linkedin.com/*",
+        // Snapchat
+        "*://tr.snapchat.com/*",
+        "*://sc-static.net/*",         "*://*.sc-static.net/*",
+        "*://snapads.com/*",           "*://*.snapads.com/*",
+        "*://businesshelp.snapchat.com/ads*",
+        // Pinterest more
+        "*://analytics.pinterest.com/*",
+        "*://widgets.pinterest.com/analytics*",
+        // YouTube
+        "*://s.youtube.com/api/stats/ads*",
+        "*://www.youtube.com/pagead*",
+        // Twitch
+        "*://spade.twitch.tv/*",       "*://ads.twitch.tv/*",
+        "*://static.ads.twitch.tv/*",
+        // Discord (tracking)
+        "*://discordapp.com/api/science*",
+        "*://discord.com/api/science*",
+
+        // ── More Cryptominers & Malware ──────────────────────────────────
+        "*://minergate.com/*",         "*://*.minergate.com/*",
+        "*://nicehash.com/*",          "*://*.nicehash.com/*",
+        "*://2giga.link/*",            "*://*.2giga.link/*",
+        "*://hashfor.cash/*",          "*://*.hashfor.cash/*",
+        "*://coin-have.com/*",         "*://*.coin-have.com/*",
+        "*://cryptobara.com/*",        "*://*.cryptobara.com/*",
+        "*://xmrpool.eu/*",            "*://*.xmrpool.eu/*",
+        "*://supportxmr.com/*",        "*://*.supportxmr.com/*",
+        "*://monerocean.stream/*",     "*://*.monerocean.stream/*",
+        "*://hashvault.pro/*",         "*://*.hashvault.pro/*",
+        "*://xmrig.com/*",             "*://*.xmrig.com/*",
+        "*://3aliansso.com/*",         "*://*.3aliansso.com/*",
+        "*://coinblind.com/*",         "*://*.coinblind.com/*",
+        "*://gridcash.net/*",          "*://*.gridcash.net/*",
+        "*://miner.rocks/*",           "*://*.miner.rocks/*",
+        "*://lmodr.biz/*",             "*://*.lmodr.biz/*",
+        "*://listat.biz/*",            "*://*.listat.biz/*",
+        "*://scriptzol.xyz/*",         "*://*.scriptzol.xyz/*",
+        "*://cfts.pw/*",               "*://*.cfts.pw/*",
+
+        // ── More Video Ads ───────────────────────────────────────────────
+        "*://ooyala.com/*",            "*://*.ooyala.com/*",
+        "*://brightroll.com/*",        "*://*.brightroll.com/*",
+        "*://beachfront.com/*",        "*://*.beachfront.com/*",
+        "*://verve.com/*",             "*://*.verve.com/*",
+        "*://rhythmone.com/*",         "*://*.rhythmone.com/*",
+        "*://360yield.com/*",          "*://*.360yield.com/*",
+        "*://undertone.com/*",         "*://*.undertone.com/*",
+        "*://yieldmo.com/*",           "*://*.yieldmo.com/*",
+        "*://xumo.tv/*",               "*://*.xumo.tv/*",
+        "*://appads.com/*",            "*://*.appads.com/*",
+        "*://videologygroup.com/*",    "*://*.videologygroup.com/*",
+        "*://playwire.com/*",          "*://*.playwire.com/*",
+        "*://synacor.com/*",           "*://*.synacor.com/*",
+        "*://freewheel.tv/*",          "*://*.freewheel.tv/*",
+        "*://stickyadstv.com/*",       "*://*.stickyadstv.com/*",
+
+        // ── More Tracking & Fingerprinting ───────────────────────────────
+        "*://forter.com/*",            "*://*.forter.com/*",
+        "*://riskiq.com/*",            "*://*.riskiq.com/*",
+        "*://inauth.com/*",            "*://*.inauth.com/*",
+        "*://accertify.com/*",         "*://*.accertify.com/*",
+        "*://kount.com/*",             "*://*.kount.com/*",
+        "*://signifyd.com/*",          "*://*.signifyd.com/*",
+        "*://bounceexchange.com/*",    "*://*.bounceexchange.com/*",
+        "*://wunderkind.co/*",         "*://*.wunderkind.co/*",
+        "*://semasio.net/*",           "*://*.semasio.net/*",
+        "*://eyeota.com/*",            "*://*.eyeota.com/*",
+        "*://weborama.com/*",          "*://*.weborama.com/*",
+        "*://pippio.com/*",            "*://*.pippio.com/*",
+        "*://nexac.com/*",             "*://*.nexac.com/*",
+        "*://netmng.com/*",            "*://*.netmng.com/*",
+        "*://audienceinsights.net/*",  "*://*.audienceinsights.net/*",
+        "*://creativecdn.com/*",       "*://*.creativecdn.com/*",
+        "*://4dex.io/*",               "*://*.4dex.io/*",
+        "*://bfmio.com/*",             "*://*.bfmio.com/*",
+        "*://zergnet.com/*",           "*://*.zergnet.com/*",
+        "*://tremorhub.com/*",         "*://*.tremorhub.com/*",
+        "*://openx.com/*",             "*://*.openx.com/*",
+        "*://permutive.com/*",         "*://*.permutive.com/*",
+
+        // ── More Consent Management ──────────────────────────────────────
+        "*://privacymanager.io/*",     "*://*.privacymanager.io/*",
+        "*://traffective.com/*",       "*://*.traffective.com/*",
+        "*://cookieinformation.com/*", "*://*.cookieinformation.com/*",
+        "*://borlabs-cookie.de/*",     "*://*.borlabs-cookie.de/*",
+        "*://consentframework.com/*",  "*://*.consentframework.com/*",
+        "*://uniconsent.com/*",        "*://*.uniconsent.com/*",
+        "*://cdn.privacy-mgmt.com/*",
+
+        // ── More Affiliate Networks ──────────────────────────────────────
+        "*://go2speed.org/*",          "*://*.go2speed.org/*",
+        "*://financeads.net/*",        "*://*.financeads.net/*",
+        "*://affilinet.com/*",         "*://*.affilinet.com/*",
+        "*://belboon.com/*",           "*://*.belboon.com/*",
+        "*://adcell.de/*",             "*://*.adcell.de/*",
+        "*://tradetracker.com/*",      "*://*.tradetracker.com/*",
+        "*://admitad.com/*",           "*://*.admitad.com/*",
+        "*://cityads.com/*",           "*://*.cityads.com/*",
+        "*://leadbit.com/*",           "*://*.leadbit.com/*",
+        "*://marketgid.com/*",         "*://*.marketgid.com/*",
+        "*://cpalead.com/*",           "*://*.cpalead.com/*",
+        "*://cpaway.com/*",            "*://*.cpaway.com/*",
+        "*://offerwall.io/*",          "*://*.offerwall.io/*",
+        "*://avangate.com/*",          "*://*.avangate.com/*",
+        "*://2checkout.com/*",         "*://*.2checkout.com/*",
+
+        // ── More Email Tracking ──────────────────────────────────────────
+        "*://postmarkapp.com/*",       "*://*.postmarkapp.com/*",
+        "*://mandrillapp.com/*",       "*://*.mandrillapp.com/*",
+        "*://campaignmonitor.com/*",   "*://*.campaignmonitor.com/*",
+        "*://createsend.com/*",        "*://*.createsend.com/*",
+        "*://aweber.com/*",            "*://*.aweber.com/*",
+        "*://infusionsoft.com/*",      "*://*.infusionsoft.com/*",
+        "*://keap.com/*",              "*://*.keap.com/*",
+        "*://mailer-analytics.net/*",  "*://*.mailer-analytics.net/*",
+        "*://emailtracker.website/*",  "*://*.emailtracker.website/*",
+        "*://whoreadme.com/*",         "*://*.whoreadme.com/*",
+        "*://bananatag.com/*",         "*://*.bananatag.com/*",
+        "*://getnotify.com/*",         "*://*.getnotify.com/*",
+        "*://yesware.com/*",           "*://*.yesware.com/*",
+
+        // ── More A/B Testing ─────────────────────────────────────────────
+        "*://launchdarkly.com/*",      "*://*.launchdarkly.com/*",
+        "*://split.io/*",              "*://*.split.io/*",
+        "*://statsig.com/*",           "*://*.statsig.com/*",
+        "*://growthbook.io/*",         "*://*.growthbook.io/*",
+        "*://flagship.io/*",           "*://*.flagship.io/*",
+        "*://apptimize.com/*",         "*://*.apptimize.com/*",
     ];
 
     private string GetAdBlockerEarlyScript()
@@ -3848,7 +4038,7 @@ public partial class MainWindow : Window
   } catch(e) {}
 
   // Comprehensive block list regex - matches all major ad/tracker/social/OEM domains
-  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|analytics\.google\.com|click\.googleanalytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|freshworks\.com|freshdesk\.com|freshchat\.com|wchat\.freshchat|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|ct\.pinterest\.com|events\.reddit\.com|redditmedia\.com|alb\.reddit\.com|pixel\.reddit\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|analytics\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)|\/pagead\.js|\/widget\/ads\.js|\/ads\.js\b|pagead2\.|adsbygoogle|advertising\.com|bidswitch\.net|contextweb\.com|sharethrough\.com|triplelift\.com|33across\.com|sovrn\.com|smartadserver\.com|teads\.(tv|com)|spotxchange\.com|spotx\.tv|undertone\.com|mediavine\.com|revcontent\.com|lijit\.com|adtech\.(com|de)|everesttech\.net|statcounter\.com|krxd\.net|quantcast\.com|adsymptotic\.com|serving-sys\.com|turn\.com|demdex\.net|bluekai\.com|exelator\.com|addthis\.com|sharethis\.com|disqus\.com\/count|livefyre\.com|apnxs\.com|adgrx\.com|lkqd\.net|freewheel\.tv|stickyadstv\.com|jwpltx\.com|jwpsrv\.com|advertising-api\.amazon|bat\.bing\.com|bat\.r\.msn\.com|c\.bing\.com\/c\b|snap\.licdn\.com|munchkin\.marketo|hs-analytics\.net|hsforms\.net|hscta\.net|hubspot\.com\/analytics|pardot\.com|marketo\.com|eloqua\.com|adsafeprotected\.com|doubleverify\.com|integral-assets\.com|optimizely\.com|mathtag\.com|hubspot\.com\/log|t\.myvisualiq\.net|insightexpressai\.com|surveymonkey\.com\/r\/ratecheck|impactradius\.com|impact\.com|shareasale\.com|cj\.com|commission-junction\.com|dpbolvw\.net|jdoqocy\.com|kqzyfj\.com|qksrv\.net|tkqlhce\.com|anrdoezrs\.net|awin\.(com|1\.com)|zanox\.com|tradedoubler\.com|viglink\.com|skimlinks\.com|skimresources\.com|pepperjam\.com|pjtra\.com|pjatr\.com|avantlink\.com|maxbounty\.com|partnerize\.com|conversant(media)?\.com|flexoffers\.com|webgains\.com|commissionfactory\.com|tune\.com|hasoffers\.com|everflow\.io|affise\.com|linkconnector\.com|cake\.com|linksynergy\.com|performancehorizon\.com|clickbooth\.com|clickbank\.com|clkmon\.com|clkrev\.com|go2cloud\.org|affiliatewindow\.com|2mdn\.net|impactradius|brightcove\.com|springserve\.com|videoamp\.com|unrulymedia\.com|tremormedia\.com|tremorvideo\.com|innovid\.com|vindico\.com|yume\.com|extreme-reach\.com|vidazoo\.com|connatix\.com|loopme\.com|gumgum\.com|primis\.tech|adtelligent\.com|magnite\.com|adap\.tv|liverail\.com|aniview\.com|onetrust\.com|cookielaw\.org|cookiebot\.com|trustarc\.com|truste\.com|consensu\.org|consentmanager\.net|didomi\.io|usercentrics\.com|iubenda\.com|cookiefirst\.com|osano\.com|sourcepoint\.com|evidon\.com|crownpeak\.com|cookie-script\.com|cookiehub\.com|termly\.io|cookieyes\.com|complianz\.io|secureprivacy\.ai|fingerprint\.com|fingerprintjs\.com|fpjscdn\.net|maxmind\.com|threatmetrix\.com|iovation\.com|sessioncam\.com|clicktale\.com|contentsquare\.com|dynatrace\.com|sift(science)?\.com|perimeterx\.com|px-cdn\.net|px-cloud\.net|imperva\.com|distilnetworks\.com|human\.security|tiqcdn\.com|tns-counter\.ru|ipqualityscore\.com|deviceatlas\.com|51degrees\.com|forensiq\.com|fraudlogix\.com|visitoridentification\.net|augur\.io|liveramp\.com|rlcdn\.com|agkn\.com|rapleaf\.com|neustar\.biz|tapad\.com|drawbridge\.com|coinhive\.com|coin-hive\.com|cryptoloot\.pro|minero\.cc|jsecoin\.com|monerominer\.rocks|webmr\.eu|coinimp\.com|papoto\.com|cryptonight\.pro|afminer\.com|coinerra\.com|minerpool\.net|nbminer\.com|crypto-loot\.com|opens\.mailchimp\.com|list-manage\.com|tracking\.sendgrid\.net|sendgrid\.net|mailgun\.org|sparkpostmail\.com|sailthru\.com|litmus\.com|vero\.co|customer\.io|klaviyo\.com|drip\.com|convertkit\.com|activecampaign\.com|constantcontact\.com|mailjet\.com|abtasty\.com|vwo\.com|convert\.com|kameleoon\.com|unbounce\.com|qubit\.com|monetate\.net|inmobi\.com|applovin\.com|ironsource\.com|vungle\.com|chartboost\.com|startapp\.com|ogury\.com|propellerads\.com|exoclick\.com|adform\.(net|com)|adjust\.com|appsflyer\.com|kochava\.com|branch\.io|singular\.net|tenjin\.io|tr\.snapchat\.com|sc-static\.net/i;
+  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|analytics\.google\.com|click\.googleanalytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|freshworks\.com|freshdesk\.com|freshchat\.com|wchat\.freshchat|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|ct\.pinterest\.com|events\.reddit\.com|redditmedia\.com|alb\.reddit\.com|pixel\.reddit\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.(net|com)|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|analytics\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)|\/pagead\.js|\/widget\/ads\.js|\/ads\.js\b|pagead2\.|adsbygoogle|advertising\.com|bidswitch\.net|contextweb\.com|sharethrough\.com|triplelift\.com|33across\.com|sovrn\.com|smartadserver\.com|teads\.(tv|com)|spotxchange\.com|spotx\.tv|undertone\.com|mediavine\.com|revcontent\.com|lijit\.com|adtech\.(com|de)|everesttech\.net|statcounter\.com|krxd\.net|quantcast\.com|adsymptotic\.com|serving-sys\.com|turn\.com|demdex\.net|bluekai\.com|exelator\.com|addthis\.com|sharethis\.com|disqus\.com\/count|livefyre\.com|apnxs\.com|adgrx\.com|lkqd\.net|freewheel\.tv|stickyadstv\.com|jwpltx\.com|jwpsrv\.com|advertising-api\.amazon|bat\.bing\.com|bat\.r\.msn\.com|c\.bing\.com\/c\b|snap\.licdn\.com|munchkin\.marketo|hs-analytics\.net|hsforms\.net|hscta\.net|hubspot\.com\/analytics|pardot\.com|marketo\.com|eloqua\.com|adsafeprotected\.com|doubleverify\.com|integral-assets\.com|optimizely\.com|mathtag\.com|hubspot\.com\/log|t\.myvisualiq\.net|insightexpressai\.com|impactradius\.com|shareasale\.com|cj\.com|commission-junction\.com|dpbolvw\.net|jdoqocy\.com|kqzyfj\.com|qksrv\.net|tkqlhce\.com|anrdoezrs\.net|awin\.(com|1\.com)|zanox\.com|tradedoubler\.com|viglink\.com|skimlinks\.com|skimresources\.com|pepperjam\.com|pjtra\.com|pjatr\.com|avantlink\.com|maxbounty\.com|partnerize\.com|conversant(media)?\.com|flexoffers\.com|webgains\.com|commissionfactory\.com|tune\.com|hasoffers\.com|everflow\.io|affise\.com|linkconnector\.com|linksynergy\.com|performancehorizon\.com|clickbooth\.com|clickbank\.com|clkmon\.com|clkrev\.com|go2cloud\.org|affiliatewindow\.com|2mdn\.net|brightcove\.com|springserve\.com|videoamp\.com|unrulymedia\.com|tremormedia\.com|tremorvideo\.com|innovid\.com|vindico\.com|yume\.com|extreme-reach\.com|vidazoo\.com|connatix\.com|loopme\.com|gumgum\.com|primis\.tech|adtelligent\.com|magnite\.com|adap\.tv|liverail\.com|aniview\.com|onetrust\.com|cookielaw\.org|cookiebot\.com|trustarc\.com|truste\.com|consensu\.org|consentmanager\.net|didomi\.io|usercentrics\.com|iubenda\.com|cookiefirst\.com|osano\.com|sourcepoint\.com|evidon\.com|crownpeak\.com|cookie-script\.com|cookiehub\.com|termly\.io|cookieyes\.com|complianz\.io|secureprivacy\.ai|fingerprint\.com|fingerprintjs\.com|fpjscdn\.net|maxmind\.com|threatmetrix\.com|iovation\.com|sessioncam\.com|clicktale\.com|contentsquare\.com|dynatrace\.com|sift(science)?\.com|perimeterx\.com|px-cdn\.net|px-cloud\.net|imperva\.com|distilnetworks\.com|human\.security|tiqcdn\.com|tns-counter\.ru|ipqualityscore\.com|deviceatlas\.com|51degrees\.com|forensiq\.com|fraudlogix\.com|visitoridentification\.net|augur\.io|liveramp\.com|rlcdn\.com|agkn\.com|rapleaf\.com|neustar\.biz|tapad\.com|drawbridge\.com|coinhive\.com|coin-hive\.com|cryptoloot\.pro|minero\.cc|jsecoin\.com|monerominer\.rocks|webmr\.eu|coinimp\.com|papoto\.com|cryptonight\.pro|afminer\.com|coinerra\.com|minerpool\.net|nbminer\.com|crypto-loot\.com|minergate\.com|nicehash\.com|2giga\.link|hashfor\.cash|coin-have\.com|xmrpool\.(net|eu)|supportxmr\.com|monerocean\.stream|hashvault\.pro|xmrig\.com|coinblind\.com|gridcash\.net|opens\.mailchimp\.com|list-manage\.com|tracking\.sendgrid\.net|sendgrid\.net|mailgun\.org|sparkpostmail\.com|sailthru\.com|litmus\.com|vero\.co|customer\.io|klaviyo\.com|drip\.com|convertkit\.com|activecampaign\.com|constantcontact\.com|mailjet\.com|postmarkapp\.com|mandrillapp\.com|campaignmonitor\.com|createsend\.com|aweber\.com|yesware\.com|bananatag\.com|abtasty\.com|vwo\.com|convert\.com|kameleoon\.com|unbounce\.com|qubit\.com|monetate\.net|launchdarkly\.com|split\.io|statsig\.com|inmobi\.com|applovin\.com|ironsource\.com|vungle\.com|chartboost\.com|startapp\.com|ogury\.com|propellerads\.com|exoclick\.com|adform\.(net|com)|adjust\.com|appsflyer\.com|kochava\.com|branch\.io|singular\.net|tenjin\.io|tr\.snapchat\.com|sc-static\.net|snapads\.com|spade\.twitch\.tv|ads\.twitch\.tv|analytics\.twitter\.com|platform\.twitter\.com|syndication\.twitter\.com|cdn\.syndication\.twimg\.com|graph\.instagram\.com|i\.instagram\.com|px\.ads\.linkedin\.com|dc\.ads\.linkedin\.com|platform\.linkedin\.com|analytics\.pinterest\.com|vivo\.com\.cn|lganalytics\.com|lgtvsdp\.com|lgsmartad\.com|lgappstv\.com|motorola\.com\/analytics|moto-analytics\.com|analyticsservices\.sony\.com|ps-metrics\.sonyentertainmentnetwork\.com|analytics\.lenovo\.com|track\.lenovo\.com|analytics\.asus\.com|splashads\.asus\.com|analytics\.hmdglobal\.com|analytics\.htc\.com|analytics\.tcl\.com|forter\.com|riskiq\.com|inauth\.com|accertify\.com|kount\.com|signifyd\.com|bounceexchange\.com|wunderkind\.co|semasio\.net|eyeota\.com|weborama\.com|pippio\.com|nexac\.com|netmng\.com|audienceinsights\.net|creativecdn\.com|permutive\.com|zergnet\.com|ooyala\.com|brightroll\.com|beachfront\.com|verve\.com|rhythmone\.com|360yield\.com|videologygroup\.com|playwire\.com|privacymanager\.io|cookieinformation\.com|uniconsent\.com|privacy-mgmt\.com|financeads\.net|affilinet\.com|belboon\.com|adcell\.de|tradetracker\.com|admitad\.com|cityads\.com|marketgid\.com/i;
 
   function isBlockedUrl(url) {
     try { return BLOCK_RE.test(url); } catch(e) { return false; }
