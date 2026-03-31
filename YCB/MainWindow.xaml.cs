@@ -522,6 +522,9 @@ public partial class MainWindow : Window
 
         // Register network-level ad blocker (checks _settings.AdBlockerEnabled at request time)
         SetupAdBlockerNetwork(webView);
+
+        // Inject early-running tracker nullifier + ad blocker script at document creation
+        await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(GetAdBlockerEarlyScript());
         
         // Setup event handlers
         SetupWebViewEvents(webView, _tabs.Count - 1);
@@ -3148,6 +3151,8 @@ public partial class MainWindow : Window
         "*://googleadservices.com/*",  "*://*.googleadservices.com/*",
         "*://pagead2.googlesyndication.com/*",
         "*://adservice.google.com/*",  "*://*.adservice.google.*/*",
+        "*://googletagmanager.com/*",  "*://*.googletagmanager.com/*",
+        "*://googletagservices.com/*", "*://*.googletagservices.com/*",
         // Ad networks
         "*://adnxs.com/*",             "*://*.adnxs.com/*",
         "*://amazon-adsystem.com/*",   "*://*.amazon-adsystem.com/*",
@@ -3171,10 +3176,19 @@ public partial class MainWindow : Window
         "*://sharethrough.com/*",      "*://*.sharethrough.com/*",
         "*://triplelift.com/*",        "*://*.triplelift.com/*",
         "*://33across.com/*",          "*://*.33across.com/*",
-        // Trackers
+        "*://sovrn.com/*",             "*://*.sovrn.com/*",
+        "*://smartadserver.com/*",     "*://*.smartadserver.com/*",
+        "*://teads.tv/*",              "*://*.teads.tv/*",
+        "*://spotxchange.com/*",       "*://*.spotxchange.com/*",
+        "*://spotx.tv/*",              "*://*.spotx.tv/*",
+        "*://undertone.com/*",         "*://*.undertone.com/*",
+        "*://adroll.com/*",            "*://*.adroll.com/*",
+        "*://perfectmarket.com/*",     "*://*.perfectmarket.com/*",
+        "*://mediavine.com/*",         "*://*.mediavine.com/*",
+        // Trackers & analytics
         "*://google-analytics.com/*",  "*://*.google-analytics.com/*",
         "*://analytics.google.com/*",
-        "*://connect.facebook.net/*",
+        "*://connect.facebook.net/*",  "*://www.facebook.com/tr/*",
         "*://hotjar.com/*",            "*://*.hotjar.com/*",
         "*://mouseflow.com/*",         "*://*.mouseflow.com/*",
         "*://mixpanel.com/*",          "*://*.mixpanel.com/*",
@@ -3187,12 +3201,86 @@ public partial class MainWindow : Window
         "*://chartbeat.com/*",         "*://*.chartbeat.com/*",
         "*://quantserve.com/*",        "*://*.quantserve.com/*",
         "*://everesttech.net/*",       "*://*.everesttech.net/*",
+        "*://statcounter.com/*",       "*://*.statcounter.com/*",
+        "*://mc.yandex.ru/*",          "*://metrika.yandex.ru/*",
+        "*://newrelic.com/*",          "*://*.newrelic.com/*",
+        "*://nr-data.net/*",           "*://*.nr-data.net/*",
+        "*://heap.io/*",               "*://*.heapanalytics.com/*",
+        "*://intercom.io/*",           "*://*.intercom.com/*",
+        "*://crazyegg.com/*",          "*://*.crazyegg.com/*",
+        "*://luckyorange.com/*",       "*://*.luckyorange.com/*",
+        "*://inspectlet.com/*",        "*://*.inspectlet.com/*",
+        "*://clicky.com/*",            "*://*.clicky.com/*",
+        "*://woopra.com/*",            "*://*.woopra.com/*",
         // Error/session trackers
         "*://sentry.io/*",             "*://*.sentry.io/*",
         "*://bugsnag.com/*",           "*://*.bugsnag.com/*",
         "*://logrocket.com/*",         "*://*.logrocket.com/*",
         "*://fullstory.com/*",         "*://*.fullstory.com/*",
+        "*://datadoghq.com/*",         "*://*.datadoghq.com/*",
+        "*://datadog-browser-agent.com/*",
     ];
+
+    private string GetAdBlockerEarlyScript() => $@"
+(function() {{
+  // Only activate if ad blocker is enabled (flag injected at document creation)
+  if (!{(_settings.AdBlockerEnabled ? "true" : "false")}) return;
+
+  var noop = function() {{}};
+  var noopObj = {{ push: noop, apply: noop, call: noop }};
+
+  // Nullify Google Analytics / GTM globals so inline code can't fire beacons
+  Object.defineProperty(window, 'ga',         {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'gtag',       {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, '_gaq',       {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'dataLayer',  {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'GoogleAnalyticsObject', {{ get: function(){{return 'ga';}}, set: noop, configurable:true }});
+
+  // Facebook pixel
+  Object.defineProperty(window, 'fbq',  {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, '_fbq', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+
+  // Yandex Metrika
+  Object.defineProperty(window, 'ym', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  window.yandex_metrika_callbacks = [];
+
+  // Hotjar
+  Object.defineProperty(window, 'hj',     {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, '_hjSettings', {{ get: function(){{return {{}};}}, set: noop, configurable:true }});
+
+  // Mixpanel
+  Object.defineProperty(window, 'mixpanel', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Microsoft Clarity
+  Object.defineProperty(window, 'clarity', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+
+  // Amplitude
+  Object.defineProperty(window, 'amplitude', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Segment
+  Object.defineProperty(window, 'analytics', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Intercom
+  Object.defineProperty(window, 'Intercom', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+
+  // New Relic
+  Object.defineProperty(window, 'NREUM',   {{ get: function(){{return {{}};}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'newrelic', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Heap
+  Object.defineProperty(window, 'heap', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Crazy Egg / Lucky Orange
+  Object.defineProperty(window, 'CE2',     {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'LO',      {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  Object.defineProperty(window, 'LOQ',     {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+
+  // Block navigator.sendBeacon (used by many trackers as a fallback)
+  if (navigator.sendBeacon) {{
+    navigator.sendBeacon = function(url) {{ return true; }};
+  }}
+}})();
+";
 
     private void SetupAdBlockerNetwork(WebView2 webView)
     {
