@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Net.Sockets;
 
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -34,7 +32,6 @@ public partial class MainWindow : Window
     private bool _isFullscreen = false;
     private HashSet<string> _adBlockDisabledSites = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _userDataFolder;
-    private readonly string _vpnUserDataFolder;
     private readonly string _incognitoUserDataFolder;
     private readonly string _settingsPath;
     private readonly string _historyPath;
@@ -56,21 +53,6 @@ public partial class MainWindow : Window
     private readonly Dictionary<WebView2, DateTime> _navStartTimes = new();
     private CoreWebView2Environment? _webViewEnvironment;
     private CoreWebView2Environment? _incognitoWebViewEnvironment;
-    // ── VPN Proxy ─────────────────────────────────────────────────────────────
-    private TcpListener? _vpnListener;
-    private CancellationTokenSource _vpnCts = new();
-    private string? _activeVpnProxy;
-    private const int VPN_LOCAL_PORT = 9799;
-    // Free India proxy pool — rotated at startup; beta users may need to provide their own
-    private static readonly string[] _indiaProxyPool =
-    [
-        "http://103.148.55.180:8080",
-        "http://103.76.186.189:3128",
-        "http://103.46.233.73:8080",
-        "http://117.247.109.210:8080",
-        "http://49.204.138.106:8080",
-        "http://45.64.91.77:3128",
-    ];
     private string? _attachedImagePath;
     private double _savedLeft, _savedTop, _savedWidth, _savedHeight;
     private WindowState _savedWindowState;
@@ -108,7 +90,6 @@ public partial class MainWindow : Window
         _startupUrl  = startupUrl;
         
         _userDataFolder = IoPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YCB-Browser");
-        _vpnUserDataFolder  = IoPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YCB-Browser-VPN");
         _incognitoUserDataFolder = IoPath.Combine(IoPath.GetTempPath(), "YCB-Incognito-" + Guid.NewGuid().ToString("N"));
         _settingsPath = IoPath.Combine(_userDataFolder, "settings.json");
         _historyPath = IoPath.Combine(_userDataFolder, "history.json");
@@ -118,7 +99,6 @@ public partial class MainWindow : Window
         _permissionsPath = IoPath.Combine(_userDataFolder, "permissions.json");
         
         Directory.CreateDirectory(_userDataFolder);
-        Directory.CreateDirectory(_vpnUserDataFolder);
         if (_isIncognito)
         {
             Directory.CreateDirectory(_incognitoUserDataFolder);
@@ -183,10 +163,6 @@ public partial class MainWindow : Window
         if (_settings.QuickDownloadEnabled)
             StartDlServer();
 
-        // VPN: start local India proxy if enabled
-        if (_settings.VpnEnabled)
-            StartVpnProxy();
-        
         // Restore tabs from last session or create new tab (incognito always starts fresh)
         if (!_isIncognito && _settings.StartupMode == "continue" && _settings.LastTabs?.Count > 0)
         {
@@ -1364,9 +1340,7 @@ public partial class MainWindow : Window
                             user_id = ErrorReporter.UserId,
                             ai_enabled = _aiEnabled ? "on" : "off",
                             quick_download_enabled = _settings.QuickDownloadEnabled ? "on" : "off",
-                            ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off",
-                            vpn_enabled = _settings.VpnEnabled ? "on" : "off",
-                            vpn_active = (_settings.VpnEnabled && _activeVpnProxy != null) ? "on" : "off"
+                            ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off"
                         };
                         var settingsDataJson = JsonSerializer.Serialize(settingsData);
                         await webView.ExecuteScriptAsync($"window.loadSettings && window.loadSettings({settingsDataJson})");
@@ -3303,6 +3277,11 @@ public partial class MainWindow : Window
         "*://freshmarketer.com/*", "*://*.freshmarketer.com/*",
         "*://*.luckyorange.net/*", "*://stats.wp.com/*",
         "*://app.getsentry.com/*",
+        // FreshWorks full suite
+        "*://freshworks.com/*", "*://*.freshworks.com/*",
+        "*://freshdesk.com/*",  "*://*.freshdesk.com/*",
+        "*://freshchat.com/*",  "*://*.freshchat.com/*",
+        "*://wchat.freshchat.com/*", "*://api.freshchat.com/*",
         // Social trackers
         "*://static.ads-twitter.com/*", "*://ads-api.twitter.com/*",
         "*://*.ads-twitter.com/*",
@@ -3343,6 +3322,59 @@ public partial class MainWindow : Window
         "*://books-analytics-events.apple.com/*",
         "*://weather-analytics-events.apple.com/*",
         "*://notes-analytics-events.apple.com/*",
+        // Additional high-value ad/tracking domains
+        "*://bat.bing.com/*",          "*://c.bing.com/*",
+        "*://adclick.g.doubleclick.net/*",
+        "*://www.googleadservices.com/*",
+        "*://tpc.googlesyndication.com/*",
+        "*://surveymonkey.com/*", "*://*.surveymonkey.com/*",
+        "*://zopim.com/*", "*://*.zopim.com/*",
+        "*://snap.licdn.com/*", "*://platform.linkedin.com/analytics/*",
+        "*://ct.pinterest.com/*",
+        "*://alb.reddit.com/*",
+        "*://pixel.reddit.com/*",
+        "*://www.redditstatic.com/ads/*",
+        "*://t.co/i/*",
+        "*://jwpltx.com/*", "*://*.jwpltx.com/*",
+        "*://jwpsrv.com/*", "*://*.jwpsrv.com/*",
+        "*://freewheel.tv/*", "*://*.freewheel.tv/*",
+        "*://cdn.flashtalking.com/*",
+        "*://go.sonobi.com/*",
+        "*://c2.taboola.com/*", "*://trc.taboola.com/*",
+        "*://syndication.twitter.com/i/*",
+        "*://t.myvisualiq.net/*",
+        "*://secure.insightexpressai.com/*",
+        "*://cdn.optimizely.com/*", "*://*.optimizely.com/*",
+        "*://d.turn.com/*", "*://rpm.turn.com/*",
+        "*://*.demdex.net/*",
+        "*://*.bluekai.com/*",
+        "*://*.exelator.com/*",
+        "*://addthis.com/*", "*://*.addthis.com/*",
+        "*://sharethis.com/*", "*://*.sharethis.com/*",
+        "*://stickyadstv.com/*", "*://*.stickyadstv.com/*",
+        "*://*.serving-sys.com/*",
+        "*://ads.rubiconproject.com/*",
+        "*://eb2.3lift.com/*",
+        "*://sync.mathtag.com/*", "*://*.mathtag.com/*",
+        "*://ads.yap.yahoo.com/*",
+        "*://udc.yahoo.com/*",
+        "*://munchkin.marketo.net/*", "*://munchkin.marketo.com/*",
+        "*://js.hs-analytics.net/*", "*://js.hsforms.net/*", "*://js.hscta.net/*",
+        "*://js.hubspot.com/*",  "*://*.hubspot.com/analytics/*",
+        "*://pardot.com/*", "*://*.pardot.com/*",
+        "*://marketo.com/*", "*://*.marketo.com/*",
+        "*://eloqua.com/*", "*://*.eloqua.com/*",
+        "*://bat.r.msn.com/*",
+        "*://*.adsafeprotected.com/*",
+        "*://*.doubleverify.com/*",
+        "*://*.integral-assets.com/*",
+        "*://*.adsafe.net/*",
+        "*://ib.adnxs.com/*",
+        "*://secure.adnxs.com/*",
+        "*://aax.amazon-adsystem.com/*",
+        "*://fls-na.amazon-adsystem.com/*",
+        "*://c.amazon-adsystem.com/*",
+        "*://*.demdex.net/*",
     ];
 
     private string GetAdBlockerEarlyScript()
@@ -3447,8 +3479,59 @@ public partial class MainWindow : Window
   // Block sendBeacon (tracker fallback)
   try { navigator.sendBeacon = function() { return true; }; } catch(e) {}
 
+  // Block Image pixel trackers (1x1 GIF beacons etc.)
+  try {
+    var _OrigImage = window.Image;
+    window.Image = function() {
+      var img = new _OrigImage();
+      var origSrcDesc = Object.getOwnPropertyDescriptor(_OrigImage.prototype, 'src');
+      Object.defineProperty(img, 'src', {
+        set: function(val) {
+          if (val && isBlockedUrl(String(val))) return;
+          if (origSrcDesc && origSrcDesc.set) origSrcDesc.set.call(img, val);
+        },
+        get: function() { return origSrcDesc && origSrcDesc.get ? origSrcDesc.get.call(img) : ''; }
+      });
+      return img;
+    };
+  } catch(e) {}
+
+  // Block dynamic <script> injection for known ad/tracker scripts
+  try {
+    var _origCreateElement = document.createElement.bind(document);
+    document.createElement = function(tag) {
+      var el = _origCreateElement(tag);
+      if (tag && tag.toLowerCase() === 'script') {
+        var origSrcDesc2 = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+        Object.defineProperty(el, 'src', {
+          set: function(val) {
+            if (val && isBlockedUrl(String(val))) {
+              // Silently ignore — do not attach to DOM
+              Object.defineProperty(el, '_blocked', { value: true, writable: true });
+              return;
+            }
+            if (origSrcDesc2 && origSrcDesc2.set) origSrcDesc2.set.call(el, val);
+          },
+          get: function() { return origSrcDesc2 && origSrcDesc2.get ? origSrcDesc2.get.call(el) : ''; },
+          configurable: true
+        });
+      }
+      return el;
+    };
+  } catch(e) {}
+
+  // Block WebSocket connections to tracker domains
+  try {
+    var _OrigWS = window.WebSocket;
+    window.WebSocket = function(url, protocols) {
+      if (url && isBlockedUrl(String(url))) throw new Error('blocked');
+      return protocols !== undefined ? new _OrigWS(url, protocols) : new _OrigWS(url);
+    };
+    window.WebSocket.prototype = _OrigWS.prototype;
+  } catch(e) {}
+
   // Comprehensive block list regex - matches all major ad/tracker/social/OEM domains
-  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|events\.reddit\.com|redditmedia\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|analytics\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)|\/pagead\.js|\/widget\/ads\.js|\/ads\.js\b|pagead2\.|adsbygoogle|advertising\.com|bidswitch\.net|contextweb\.com|sharethrough\.com|triplelift\.com|33across\.com|sovrn\.com|smartadserver\.com|teads\.(tv|com)|spotxchange\.com|spotx\.tv|undertone\.com|mediavine\.com|revcontent\.com|lijit\.com|adtech\.(com|de)|everesttech\.net|statcounter\.com|krxd\.net|quantcast\.com|adsymptotic\.com|serving-sys\.com|turn\.com|demdex\.net|bluekai\.com|exelator\.com|addthis\.com|sharethis\.com|disqus\.com\/count|livefyre\.com|apnxs\.com|adgrx\.com|lkqd\.net|freewheel\.tv|stickyadstv\.com|jwpltx\.com|jwpsrv\.com|advertising-api\.amazon/i;
+  var BLOCK_RE = /googlesyndication\.com|doubleclick\.net|googleadservices\.com|googletagmanager\.com|googleanalytics\.com|google-analytics\.com|adservice\.google\.|adcolony\.com|media\.net|hotjar\.(com|io)|mouseflow\.com|freshmarketer\.com|freshworks\.com|freshdesk\.com|freshchat\.com|wchat\.freshchat|luckyorange\.|stats\.wp\.com|bugsnag\.com|sentry-cdn\.com|getsentry\.com|sentry\.io|pixel\.facebook\.com|an\.facebook\.com|connect\.facebook\.(com|net)|ads-twitter\.com|ads-api\.twitter\.com|ads\.linkedin\.com|pointdrive\.linkedin\.com|ads\.pinterest\.com|log\.pinterest\.com|trk\.pinterest\.com|ct\.pinterest\.com|events\.reddit\.com|redditmedia\.com|alb\.reddit\.com|pixel\.reddit\.com|ads\.youtube\.com|tiktok\.(com|sg)|byteoversea\.com|ads\.yahoo\.com|analytics\.yahoo\.com|geo\.yahoo\.com|udcm\.yahoo\.com|ysm\.yahoo\.com|log\.fc\.yahoo\.com|gemini\.yahoo\.com|yahooinc\.com|appmetrica\.yandex|adfstat\.yandex|metrika\.yandex|mc\.yandex\.ru|offerwall\.yandex|adfox\.yandex|extmaps-api\.yandex|unityads\.unity3d\.com|realme\.com|realmemobile\.com|mistat\.xiaomi|ad\.xiaomi\.com|sdkconfig\.ad|tracking\.rus\.miui|oppomobile\.com|hicloud\.com|oneplus\.(cn|net)|samsungads\.com|smetrics\.samsung|nmetrics\.samsung|samsung-com\.112|samsunghealthcn|iadsdk\.apple\.com|metrics\.icloud\.com|metrics\.mzstatic\.com|api-adservices\.apple\.com|analytics-events\.apple\.com|newrelic\.com|nr-data\.net|rollbar\.com|raygun\.com|datadog|logrocket\.com|fullstory\.com|clarity\.ms|amplitude\.com|mixpanel\.com|segment\.(io|com)|heap\.io|heapanalytics|intercom\.(io|com)|crazyegg|inspectlet|clicky\.com|woopra\.com|chartbeat|scorecardresearch|comscore\.com|quantserve|adnxs\.com|amazon-adsystem\.com|pubmatic\.com|openx\.net|rubiconproject|casalemedia|adsrvr\.org|moatads|yieldmo|criteo\.com|taboola\.com|outbrain\.com|adroll\.com|adtago\.s3\.amazonaws|analyticsengine\.s3\.amazonaws|analytics\.s3\.amazonaws|advice-ads\.s3\.amazonaws|facebook\.com\/(tr|pixel)|\/pagead\.js|\/widget\/ads\.js|\/ads\.js\b|pagead2\.|adsbygoogle|advertising\.com|bidswitch\.net|contextweb\.com|sharethrough\.com|triplelift\.com|33across\.com|sovrn\.com|smartadserver\.com|teads\.(tv|com)|spotxchange\.com|spotx\.tv|undertone\.com|mediavine\.com|revcontent\.com|lijit\.com|adtech\.(com|de)|everesttech\.net|statcounter\.com|krxd\.net|quantcast\.com|adsymptotic\.com|serving-sys\.com|turn\.com|demdex\.net|bluekai\.com|exelator\.com|addthis\.com|sharethis\.com|disqus\.com\/count|livefyre\.com|apnxs\.com|adgrx\.com|lkqd\.net|freewheel\.tv|stickyadstv\.com|jwpltx\.com|jwpsrv\.com|advertising-api\.amazon|bat\.bing\.com|bat\.r\.msn\.com|c\.bing\.com\/c\b|snap\.licdn\.com|munchkin\.marketo|hs-analytics\.net|hsforms\.net|hscta\.net|hubspot\.com\/analytics|pardot\.com|marketo\.com|eloqua\.com|adsafeprotected\.com|doubleverify\.com|integral-assets\.com|optimizely\.com|mathtag\.com|hubspot\.com\/log|t\.myvisualiq\.net|insightexpressai\.com|surveymonkey\.com\/r\/ratecheck/i;
 
   function isBlockedUrl(url) {
     try { return BLOCK_RE.test(url); } catch(e) { return false; }
@@ -3557,176 +3640,9 @@ public partial class MainWindow : Window
 ";
     }
 
-    // ── VPN / India Proxy ─────────────────────────────────────────────────────
 
-    private async Task<CoreWebView2Environment> CreateWebViewEnvironment(string dataFolder)
-    {
-        if (_settings.VpnEnabled)
-        {
-            // Use dedicated VPN data folder so there's no conflict with the normal browser process
-            var opts = new CoreWebView2EnvironmentOptions(
-                $"--proxy-server=http://127.0.0.1:{VPN_LOCAL_PORT} " +
-                "--proxy-bypass-list=<-loopback>;ycb://*;localhost;127.0.0.1");
-            return await CoreWebView2Environment.CreateAsync(null, _vpnUserDataFolder, opts);
-        }
-        return await CoreWebView2Environment.CreateAsync(null, dataFolder);
-    }
-
-    private void StartVpnProxy()
-    {
-        _vpnCts?.Cancel();
-        _vpnCts = new CancellationTokenSource();
-        var ct = _vpnCts.Token;
-        Task.Run(async () =>
-        {
-            var pool = _settings.VpnProxyAddress is { Length: > 0 } custom
-                ? [custom]
-                : _indiaProxyPool;
-            _activeVpnProxy = await FindWorkingProxyAsync(pool, ct);
-            try
-            {
-                _vpnListener = new TcpListener(IPAddress.Loopback, VPN_LOCAL_PORT);
-                _vpnListener.Start();
-                while (!ct.IsCancellationRequested)
-                {
-                    var client = await _vpnListener.AcceptTcpClientAsync(ct);
-                    _ = Task.Run(() => HandleVpnClientAsync(client, _activeVpnProxy, ct), ct);
-                }
-            }
-            catch { }
-        }, ct);
-    }
-
-    private void StopVpnProxy()
-    {
-        _vpnCts?.Cancel();
-        _vpnListener?.Stop();
-        _vpnListener = null;
-        _activeVpnProxy = null;
-    }
-
-    private static async Task<string?> FindWorkingProxyAsync(string[] proxies, CancellationToken ct)
-    {
-        foreach (var proxy in proxies)
-        {
-            try
-            {
-                var uri = new Uri(proxy);
-                using var tcp = new TcpClient();
-                var connectTask = tcp.ConnectAsync(uri.Host, uri.Port, ct).AsTask();
-                if (await Task.WhenAny(connectTask, Task.Delay(3000, ct)) == connectTask && !connectTask.IsFaulted)
-                    return proxy;
-            }
-            catch { }
-        }
-        return null;
-    }
-
-    private static async Task HandleVpnClientAsync(TcpClient client, string? upstream, CancellationToken ct)
-    {
-        using (client)
-        {
-            client.ReceiveTimeout = 15000;
-            client.SendTimeout = 15000;
-            try
-            {
-                using var cStream = client.GetStream();
-                var buf = new byte[65536];
-                int n = await cStream.ReadAsync(buf, 0, buf.Length, ct);
-                if (n == 0) return;
-                var header = Encoding.ASCII.GetString(buf, 0, n);
-
-                if (header.StartsWith("CONNECT ", StringComparison.OrdinalIgnoreCase))
-                {
-                    // HTTPS CONNECT tunnel
-                    var target = header.Split(' ')[1].Trim();
-                    var hp = target.Split(':');
-                    var host = hp[0];
-                    int port = hp.Length > 1 && int.TryParse(hp[1], out int p) ? p : 443;
-
-                    TcpClient? up = null;
-                    Stream? upStream = null;
-
-                    if (upstream != null)
-                    {
-                        var upUri = new Uri(upstream);
-                        up = new TcpClient();
-                        await up.ConnectAsync(upUri.Host, upUri.Port, ct);
-                        upStream = up.GetStream();
-                        var msg = $"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\nProxy-Connection: keep-alive\r\n\r\n";
-                        await upStream.WriteAsync(Encoding.ASCII.GetBytes(msg), ct);
-                        var rb = new byte[1024];
-                        int rn = await upStream.ReadAsync(rb, 0, rb.Length, ct);
-                        if (!Encoding.ASCII.GetString(rb, 0, rn).Contains("200")) { up.Dispose(); return; }
-                    }
-                    else
-                    {
-                        // No upstream — direct connection (fallback, reveals real IP)
-                        up = new TcpClient();
-                        await up.ConnectAsync(host, port, ct);
-                        upStream = up.GetStream();
-                    }
-
-                    using (up)
-                    {
-                        await cStream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), ct);
-                        await Task.WhenAny(
-                            VpnPipeAsync(cStream, upStream, ct),
-                            VpnPipeAsync(upStream, cStream, ct));
-                    }
-                }
-                else
-                {
-                    // HTTP request — forward via upstream
-                    var firstLine = header.Split('\n')[0].Trim();
-                    var parts = firstLine.Split(' ');
-                    if (parts.Length < 2 || !parts[1].StartsWith("http")) return;
-
-                    using var handler = new HttpClientHandler
-                    {
-                        AllowAutoRedirect = false,
-                        UseProxy = upstream != null,
-                        Proxy = upstream != null ? new WebProxy(upstream) : null
-                    };
-                    using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
-                    var req = new HttpRequestMessage(new HttpMethod(parts[0]), parts[1]);
-                    foreach (var line in header.Split('\n').Skip(1))
-                    {
-                        var t = line.Trim();
-                        if (t.Length == 0) break;
-                        var ci = t.IndexOf(':');
-                        if (ci < 0) continue;
-                        var k = t[..ci].Trim();
-                        var v = t[(ci + 1)..].Trim();
-                        if (k.Equals("Host", StringComparison.OrdinalIgnoreCase)) continue;
-                        if (k.StartsWith("Proxy-", StringComparison.OrdinalIgnoreCase)) continue;
-                        try { req.Headers.TryAddWithoutValidation(k, v); } catch { }
-                    }
-                    var resp = await httpClient.SendAsync(req, ct);
-                    var body = await resp.Content.ReadAsByteArrayAsync(ct);
-                    var respHeader = $"HTTP/1.1 {(int)resp.StatusCode} {resp.ReasonPhrase}\r\n";
-                    foreach (var h in resp.Headers.Concat(resp.Content.Headers))
-                        respHeader += $"{h.Key}: {string.Join(", ", h.Value)}\r\n";
-                    respHeader += $"Content-Length: {body.Length}\r\n\r\n";
-                    await cStream.WriteAsync(Encoding.ASCII.GetBytes(respHeader), ct);
-                    await cStream.WriteAsync(body, ct);
-                }
-            }
-            catch { }
-        }
-    }
-
-    private static async Task VpnPipeAsync(Stream src, Stream dst, CancellationToken ct)
-    {
-        var buf = new byte[16384];
-        try
-        {
-            int n;
-            while ((n = await src.ReadAsync(buf, ct)) > 0)
-                await dst.WriteAsync(buf.AsMemory(0, n), ct);
-        }
-        catch { }
-    }
+    private static Task<CoreWebView2Environment> CreateWebViewEnvironment(string dataFolder)
+        => CoreWebView2Environment.CreateAsync(null, dataFolder);
 
     private void SetupAdBlockerNetwork(WebView2 webView)
     {
@@ -5121,25 +5037,6 @@ public partial class MainWindow : Window
                 SaveSettings();
                 UpdateAdBlockButton();
                 break;
-
-            case "vpn_enabled":
-                _settings.VpnEnabled = value == "on";
-                SaveSettings();
-                // Start/stop the local proxy server immediately
-                if (_settings.VpnEnabled)
-                    StartVpnProxy();
-                else
-                    StopVpnProxy();
-                // NOTE: We do NOT null the WebView environments here.
-                // Changing the proxy requires a new environment, which means
-                // a new browser process. Existing tabs keep their current environment.
-                // The new setting will be applied on the next launch of YCB.
-                break;
-
-            case "vpn_proxy_address":
-                _settings.VpnProxyAddress = string.IsNullOrWhiteSpace(value) ? null : value;
-                SaveSettings();
-                break;
         }
     }
     
@@ -5657,8 +5554,6 @@ public class Settings
     public bool QuickDownloadEnabled { get; set; } = false;
     public bool AdBlockerEnabled { get; set; } = false;
     public List<string>? AdBlockerDisabledSites { get; set; }
-    public bool VpnEnabled { get; set; } = false;
-    public string? VpnProxyAddress { get; set; }
 
 }
 
