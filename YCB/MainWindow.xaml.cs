@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private bool _isDarkMode = true;
     private bool _copilotVisible = false;
     private bool _isFullscreen = false;
+    private HashSet<string> _adBlockDisabledSites = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _userDataFolder;
     private readonly string _incognitoUserDataFolder;
     private readonly string _settingsPath;
@@ -393,6 +394,8 @@ public partial class MainWindow : Window
         _isDarkMode = _settings.DarkMode;
         _searchEngine = _settings.SearchEngine ?? "google";
         ErrorReporter.IsEnabled = _settings.TelemetryEnabled;
+        _adBlockDisabledSites = new HashSet<string>(
+            _settings.AdBlockerDisabledSites ?? [], StringComparer.OrdinalIgnoreCase);
     }
     
     private void SaveSettings()
@@ -834,6 +837,8 @@ public partial class MainWindow : Window
             var idx = GetTabIndexForWebView(webView);
             if (idx >= 0 && idx < _tabs.Count)
                 _tabs[idx].Url = src;
+            if (idx == _activeTabIndex)
+                Dispatcher.InvokeAsync(UpdateAdBlockButton);
         };
         
         webView.CoreWebView2.DocumentTitleChanged += (s, e) =>
@@ -3143,6 +3148,43 @@ public partial class MainWindow : Window
         catch { return raw; }
     }
 
+    private void AdBlock_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = _tabs.ElementAtOrDefault(_activeTabIndex);
+        if (!Uri.TryCreate(tab?.Url ?? "", UriKind.Absolute, out var uri)) return;
+        var host = uri.Host;
+        if (_adBlockDisabledSites.Contains(host))
+            _adBlockDisabledSites.Remove(host);
+        else
+            _adBlockDisabledSites.Add(host);
+        _settings.AdBlockerDisabledSites = _adBlockDisabledSites.ToList();
+        SaveSettings();
+        UpdateAdBlockButton();
+    }
+
+    private void UpdateAdBlockButton()
+    {
+        var tab = _tabs.ElementAtOrDefault(_activeTabIndex);
+        var url = tab?.Url ?? "";
+        var isHttp = url.StartsWith("http://") || url.StartsWith("https://");
+        AdBlockBtn.Visibility = (_settings.AdBlockerEnabled && isHttp) ? Visibility.Visible : Visibility.Collapsed;
+        if (!_settings.AdBlockerEnabled || !isHttp) return;
+
+        Uri.TryCreate(url, UriKind.Absolute, out var uri);
+        var host = uri?.Host ?? "";
+        var siteOn = !_adBlockDisabledSites.Contains(host);
+        var color = siteOn ? "#81c995" : "#9aa0a6";
+        var brush = new System.Windows.Media.SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
+        AdBlockShieldBody.Stroke = brush;
+        AdBlockShieldMark.Stroke = brush;
+        AdBlockShieldMark.Data = System.Windows.Media.Geometry.Parse(
+            siteOn ? "M6 9 L8 11 L12 6.5" : "M6.5 6.5 L11.5 11.5 M11.5 6.5 L6.5 11.5");
+        AdBlockBtn.ToolTip = siteOn
+            ? "Ad blocker: ON for this site (click to disable)"
+            : "Ad blocker: OFF for this site (click to re-enable)";
+    }
+
     private static readonly string[] _adBlockDomains =
     [
         // Google Ads
@@ -3214,73 +3256,149 @@ public partial class MainWindow : Window
         "*://woopra.com/*",            "*://*.woopra.com/*",
         // Error/session trackers
         "*://sentry.io/*",             "*://*.sentry.io/*",
+        "*://browser.sentry-cdn.com/*","*://js.sentry-cdn.com/*",
         "*://bugsnag.com/*",           "*://*.bugsnag.com/*",
+        "*://bugsnag-builds.s3.amazonaws.com/*",
         "*://logrocket.com/*",         "*://*.logrocket.com/*",
         "*://fullstory.com/*",         "*://*.fullstory.com/*",
         "*://datadoghq.com/*",         "*://*.datadoghq.com/*",
         "*://datadog-browser-agent.com/*",
+        "*://js-agent.newrelic.com/*", "*://bam.nr-data.net/*",
+        "*://cdn.rollbar.com/*",       "*://*.rollbar.com/*",
+        "*://raygun.com/*",            "*://*.raygun.com/*",
+        "*://az416426.vo.msecnd.net/*",
     ];
 
-    private string GetAdBlockerEarlyScript() => $@"
-(function() {{
-  // Only activate if ad blocker is enabled (flag injected at document creation)
-  if (!{(_settings.AdBlockerEnabled ? "true" : "false")}) return;
+    private string GetAdBlockerEarlyScript()
+    {
+        if (!_settings.AdBlockerEnabled) return "void 0;";
+        return @"
+(function() {
+  'use strict';
+  var noop = function() { return false; };
+  // Allow override (for sites where ad blocking is disabled, real scripts will overwrite)
+  function def(name, val) {
+    try {
+      var _v = val;
+      Object.defineProperty(window, name, {
+        get: function() { return _v; },
+        set: function(v) { _v = v; },
+        configurable: true
+      });
+    } catch(e) {}
+  }
+  var noopObj = { push: noop, apply: noop, call: noop, track: noop, identify: noop,
+                  init: noop, log: noop, loaded: noop, queue: [] };
 
-  var noop = function() {{}};
-  var noopObj = {{ push: noop, apply: noop, call: noop }};
+  // Google Analytics / GTM
+  def('ga', noop); def('gtag', noop); def('_gaq', noopObj);
+  def('dataLayer', noopObj); def('GoogleAnalyticsObject', 'ga');
+  def('google_tag_manager', {}); def('google_tag_data', {});
 
-  // Nullify Google Analytics / GTM globals so inline code can't fire beacons
-  Object.defineProperty(window, 'ga',         {{ get: function(){{return noop;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'gtag',       {{ get: function(){{return noop;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, '_gaq',       {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'dataLayer',  {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'GoogleAnalyticsObject', {{ get: function(){{return 'ga';}}, set: noop, configurable:true }});
-
-  // Facebook pixel
-  Object.defineProperty(window, 'fbq',  {{ get: function(){{return noop;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, '_fbq', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  // Facebook
+  def('fbq', noop); def('_fbq', noop);
 
   // Yandex Metrika
-  Object.defineProperty(window, 'ym', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
-  window.yandex_metrika_callbacks = [];
+  def('ym', noop); window.yandex_metrika_callbacks = [];
 
   // Hotjar
-  Object.defineProperty(window, 'hj',     {{ get: function(){{return noop;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, '_hjSettings', {{ get: function(){{return {{}};}}, set: noop, configurable:true }});
+  def('hj', noop); def('_hjSettings', {});
+  def('_hjid', null); def('_hjSessionUser', null);
 
   // Mixpanel
-  Object.defineProperty(window, 'mixpanel', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  def('mixpanel', noopObj);
 
   // Microsoft Clarity
-  Object.defineProperty(window, 'clarity', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  def('clarity', noop);
 
   // Amplitude
-  Object.defineProperty(window, 'amplitude', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  def('amplitude', noopObj);
 
-  // Segment
-  Object.defineProperty(window, 'analytics', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  // Segment / analytics.js
+  def('analytics', noopObj);
 
   // Intercom
-  Object.defineProperty(window, 'Intercom', {{ get: function(){{return noop;}}, set: noop, configurable:true }});
+  def('Intercom', noop);
 
   // New Relic
-  Object.defineProperty(window, 'NREUM',   {{ get: function(){{return {{}};}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'newrelic', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  def('NREUM', {}); def('newrelic', noopObj);
 
   // Heap
-  Object.defineProperty(window, 'heap', {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  def('heap', noopObj);
 
   // Crazy Egg / Lucky Orange
-  Object.defineProperty(window, 'CE2',     {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'LO',      {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
-  Object.defineProperty(window, 'LOQ',     {{ get: function(){{return noopObj;}}, set: noop, configurable:true }});
+  def('CE2', noopObj); def('LO', noopObj); def('LOQ', noopObj);
 
-  // Block navigator.sendBeacon (used by many trackers as a fallback)
-  if (navigator.sendBeacon) {{
-    navigator.sendBeacon = function(url) {{ return true; }};
-  }}
-}})();
+  // Sentry
+  def('Sentry', { init: noop, captureException: noop, captureMessage: noop,
+                  configureScope: noop, setUser: noop, addBreadcrumb: noop });
+  def('__sentryRewritesTunnelPath__', undefined);
+
+  // Bugsnag
+  def('Bugsnag', { notify: noop, start: noop, startSession: noop, leaveBreadcrumb: noop });
+  def('bugsnag', noop);
+
+  // Rollbar
+  def('Rollbar', { init: noop, error: noop, warning: noop, info: noop, debug: noop,
+                   critical: noop, configure: noop });
+  def('_rollbarConfig', {});
+
+  // Raygun
+  def('rg4js', noop); def('Raygun', noopObj);
+
+  // Datadog RUM
+  def('DD_RUM', { init: noop, addError: noop, addTiming: noop, setUser: noop });
+  def('DD_LOGS', { init: noop, logger: noopObj });
+
+  // LogRocket
+  def('LogRocket', { init: noop, identify: noop, track: noop, getSessionURL: noop });
+
+  // FullStory
+  def('FS', noop); def('_fs_namespace', 'FS');
+
+  // Mouseflow / CrazyEgg session replay
+  def('mouseflow', noopObj); def('_mfq', noopObj);
+  def('CE_API', noopObj);
+
+  // Chartbeat
+  def('_sf_async_config', {}); def('pSUPERFLY', noopObj);
+
+  // Quantcast
+  def('__qc', noopObj);
+
+  // Comscore
+  def('COMSCORE', { beacon: noop, purge: noop });
+
+  // Block sendBeacon (tracker fallback)
+  try { navigator.sendBeacon = function() { return true; }; } catch(e) {}
+
+  // Block XMLHttpRequest to known tracker endpoints
+  var _origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    if (/google-analytics|doubleclick|googletagmanager|facebook\.com\/tr|hotjar|sentry\.io|bugsnag|rollbar|raygun|newrelic|nr-data\.net|clarity\.ms|amplitude|mixpanel|segment\.io|fullstory|logrocket|datadog/i.test(url)) {
+      this._blocked = true;
+      return;
+    }
+    return _origOpen.apply(this, arguments);
+  };
+  var _origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function(body) {
+    if (this._blocked) return;
+    return _origSend.apply(this, arguments);
+  };
+
+  // Block fetch to tracker endpoints
+  var _origFetch = window.fetch;
+  window.fetch = function(input, init) {
+    var url = (typeof input === 'string') ? input : (input && input.url) || '';
+    if (/google-analytics|doubleclick|googletagmanager|facebook\.com\/tr|hotjar|sentry\.io|bugsnag|rollbar|raygun|newrelic|nr-data\.net|clarity\.ms|amplitude|mixpanel|segment\.io|fullstory|logrocket|datadog/i.test(url)) {
+      return Promise.resolve(new Response('', { status: 200 }));
+    }
+    return _origFetch.apply(this, arguments);
+  };
+})();
 ";
+    }
 
     private void SetupAdBlockerNetwork(WebView2 webView)
     {
@@ -3290,7 +3408,9 @@ public partial class MainWindow : Window
         webView.CoreWebView2.WebResourceRequested += (s, e) =>
         {
             if (!_settings.AdBlockerEnabled) return;
-            // Return an empty 200 response to silently swallow the request
+            var pageUrl = webView.Source?.ToString() ?? "";
+            if (Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri) &&
+                _adBlockDisabledSites.Contains(pageUri.Host)) return;
             e.Response = _webViewEnvironment!.CreateWebResourceResponse(null, 200, "OK", "");
         };
     }
@@ -3387,6 +3507,22 @@ public partial class MainWindow : Window
   });
 
   observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Hide images loaded from ad-related paths (banner image ads)
+  var AD_IMG_RE = /[/?=](ads?|advert|banner|bnr|sponsor|promo)[/?=.]|\/(ads?|banners?)\//i;
+  function hideAdImages(root) {
+    try {
+      root.querySelectorAll('img[src]').forEach(function(img) {
+        if (AD_IMG_RE.test(img.src)) { img.style.cssText += ';display:none!important'; }
+      });
+    } catch(e) {}
+  }
+  hideAdImages(document);
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(n) { if (n.nodeType === 1) hideAdImages(n); });
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();
 ";
 
@@ -4550,6 +4686,7 @@ public partial class MainWindow : Window
             case "ad_blocker_enabled":
                 _settings.AdBlockerEnabled = value == "on";
                 SaveSettings();
+                UpdateAdBlockButton();
                 break;
         }
     }
@@ -5067,6 +5204,7 @@ public class Settings
     public string? WindowState { get; set; }
     public bool QuickDownloadEnabled { get; set; } = false;
     public bool AdBlockerEnabled { get; set; } = false;
+    public List<string>? AdBlockerDisabledSites { get; set; }
 
 }
 

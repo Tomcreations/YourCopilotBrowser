@@ -166,6 +166,20 @@
             
             <!-- Toolbar Actions: gap 2px -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,6,0">
+            <!-- Ad Blocker Site Toggle Button -->
+                <Button x:Name="AdBlockBtn" Click="AdBlock_Click" Style="{StaticResource NavBtnStyle}"
+                        ToolTip="Ad blocker active for this site" Visibility="Collapsed">
+                    <Canvas Width="18" Height="18">
+                        <Path x:Name="AdBlockShieldBody"
+                              Data="M9 1.5 L2.5 4 L2.5 8.5 C2.5 12.5 5.5 15.5 9 16.5 C12.5 15.5 15.5 12.5 15.5 8.5 L15.5 4 Z"
+                              Stroke="#81c995" StrokeThickness="1.4" Fill="Transparent"/>
+                        <Path x:Name="AdBlockShieldMark"
+                              Data="M6 9 L8 11 L12 6.5"
+                              Stroke="#81c995" StrokeThickness="1.4"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    </Canvas>
+                </Button>
+
                 <!-- Copilot Button -->
                 <Button x:Name="CopilotBtn" Click="Copilot_Click" Style="{StaticResource NavBtnStyle}" 
                         ToolTip="Open Copilot">
