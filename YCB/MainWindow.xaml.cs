@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private bool _isFullscreen = false;
     private HashSet<string> _adBlockDisabledSites = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _userDataFolder;
+    private readonly string _vpnUserDataFolder;
     private readonly string _incognitoUserDataFolder;
     private readonly string _settingsPath;
     private readonly string _historyPath;
@@ -107,6 +108,7 @@ public partial class MainWindow : Window
         _startupUrl  = startupUrl;
         
         _userDataFolder = IoPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YCB-Browser");
+        _vpnUserDataFolder  = IoPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YCB-Browser-VPN");
         _incognitoUserDataFolder = IoPath.Combine(IoPath.GetTempPath(), "YCB-Incognito-" + Guid.NewGuid().ToString("N"));
         _settingsPath = IoPath.Combine(_userDataFolder, "settings.json");
         _historyPath = IoPath.Combine(_userDataFolder, "history.json");
@@ -116,6 +118,7 @@ public partial class MainWindow : Window
         _permissionsPath = IoPath.Combine(_userDataFolder, "permissions.json");
         
         Directory.CreateDirectory(_userDataFolder);
+        Directory.CreateDirectory(_vpnUserDataFolder);
         if (_isIncognito)
         {
             Directory.CreateDirectory(_incognitoUserDataFolder);
@@ -3560,10 +3563,11 @@ public partial class MainWindow : Window
     {
         if (_settings.VpnEnabled)
         {
+            // Use dedicated VPN data folder so there's no conflict with the normal browser process
             var opts = new CoreWebView2EnvironmentOptions(
                 $"--proxy-server=http://127.0.0.1:{VPN_LOCAL_PORT} " +
                 "--proxy-bypass-list=<-loopback>;ycb://*;localhost;127.0.0.1");
-            return await CoreWebView2Environment.CreateAsync(null, dataFolder, opts);
+            return await CoreWebView2Environment.CreateAsync(null, _vpnUserDataFolder, opts);
         }
         return await CoreWebView2Environment.CreateAsync(null, dataFolder);
     }
@@ -5121,15 +5125,15 @@ public partial class MainWindow : Window
             case "vpn_enabled":
                 _settings.VpnEnabled = value == "on";
                 SaveSettings();
-                // VPN requires environment recreation — show restart notice
-                // Immediately start/stop proxy for next new tab
+                // Start/stop the local proxy server immediately
                 if (_settings.VpnEnabled)
                     StartVpnProxy();
                 else
                     StopVpnProxy();
-                // Reset cached environments so next tab picks up new proxy
-                _webViewEnvironment = null;
-                _incognitoWebViewEnvironment = null;
+                // NOTE: We do NOT null the WebView environments here.
+                // Changing the proxy requires a new environment, which means
+                // a new browser process. Existing tabs keep their current environment.
+                // The new setting will be applied on the next launch of YCB.
                 break;
 
             case "vpn_proxy_address":
