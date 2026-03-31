@@ -1,0 +1,3 @@
+ycb-smartdl.exe was removed from this repository because the file size (91 MB) exceeds GitHub's recommended maximum file size of 50 MB.
+
+To get the file, build it from source in the ycb-smartdl/ folder, or download it from a YCB release.
