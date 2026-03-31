@@ -3259,6 +3259,7 @@ public partial class MainWindow : Window
         "*://browser.sentry-cdn.com/*","*://js.sentry-cdn.com/*",
         "*://bugsnag.com/*",           "*://*.bugsnag.com/*",
         "*://bugsnag-builds.s3.amazonaws.com/*",
+        "*://d2wy8f7a9ursnm.cloudfront.net/*",
         "*://logrocket.com/*",         "*://*.logrocket.com/*",
         "*://fullstory.com/*",         "*://*.fullstory.com/*",
         "*://datadoghq.com/*",         "*://*.datadoghq.com/*",
@@ -3275,7 +3276,6 @@ public partial class MainWindow : Window
         return @"
 (function() {
   'use strict';
-  var noop = function() { return false; };
   // Lock down globals so tracker scripts cannot override them
   function def(name, val) {
     try {
@@ -3286,87 +3286,84 @@ public partial class MainWindow : Window
       });
     } catch(e) {}
   }
-  var noopObj = { push: noop, apply: noop, call: noop, track: noop, identify: noop,
-                  init: noop, log: noop, loaded: noop, queue: [] };
 
+  // All tracker globals set to undefined so typeof checks return 'undefined' → eval detects as blocked
   // Google Analytics / GTM
-  def('ga', noop); def('gtag', noop); def('_gaq', noopObj);
-  def('dataLayer', noopObj); def('GoogleAnalyticsObject', 'ga');
-  def('google_tag_manager', {}); def('google_tag_data', {});
+  def('ga', undefined); def('gtag', undefined); def('_gaq', undefined);
+  def('dataLayer', undefined); def('GoogleAnalyticsObject', undefined);
+  def('google_tag_manager', undefined); def('google_tag_data', undefined);
 
   // Facebook
-  def('fbq', noop); def('_fbq', noop);
+  def('fbq', undefined); def('_fbq', undefined);
 
   // Yandex Metrika
-  def('ym', noop); window.yandex_metrika_callbacks = [];
+  def('ym', undefined);
+  def('yandex_metrika_callbacks', undefined);
+  def('yandexContextAsyncCallbacks', undefined);
 
   // Hotjar
-  def('hj', noop); def('_hjSettings', {});
-  def('_hjid', null); def('_hjSessionUser', null);
+  def('hj', undefined); def('_hjSettings', undefined);
+  def('_hjid', undefined); def('_hjSessionUser', undefined);
 
   // Mixpanel
-  def('mixpanel', noopObj);
+  def('mixpanel', undefined);
 
   // Microsoft Clarity
-  def('clarity', noop);
+  def('clarity', undefined);
 
   // Amplitude
-  def('amplitude', noopObj);
+  def('amplitude', undefined);
 
   // Segment / analytics.js
-  def('analytics', noopObj);
+  def('analytics', undefined);
 
   // Intercom
-  def('Intercom', noop);
+  def('Intercom', undefined);
 
   // New Relic
-  def('NREUM', {}); def('newrelic', noopObj);
+  def('NREUM', undefined); def('newrelic', undefined);
 
   // Heap
-  def('heap', noopObj);
+  def('heap', undefined);
 
   // Crazy Egg / Lucky Orange
-  def('CE2', noopObj); def('LO', noopObj); def('LOQ', noopObj);
+  def('CE2', undefined); def('LO', undefined); def('LOQ', undefined);
 
   // Sentry
-  def('Sentry', { init: noop, captureException: noop, captureMessage: noop,
-                  configureScope: noop, setUser: noop, addBreadcrumb: noop });
+  def('Sentry', undefined);
   def('__sentryRewritesTunnelPath__', undefined);
+  def('__SENTRY__', undefined);
 
   // Bugsnag
-  def('Bugsnag', { notify: noop, start: noop, startSession: noop, leaveBreadcrumb: noop });
-  def('bugsnag', noop);
+  def('Bugsnag', undefined); def('bugsnag', undefined);
 
   // Rollbar
-  def('Rollbar', { init: noop, error: noop, warning: noop, info: noop, debug: noop,
-                   critical: noop, configure: noop });
-  def('_rollbarConfig', {});
+  def('Rollbar', undefined); def('_rollbarConfig', undefined);
 
   // Raygun
-  def('rg4js', noop); def('Raygun', noopObj);
+  def('rg4js', undefined); def('Raygun', undefined);
 
   // Datadog RUM
-  def('DD_RUM', { init: noop, addError: noop, addTiming: noop, setUser: noop });
-  def('DD_LOGS', { init: noop, logger: noopObj });
+  def('DD_RUM', undefined); def('DD_LOGS', undefined);
 
   // LogRocket
-  def('LogRocket', { init: noop, identify: noop, track: noop, getSessionURL: noop });
+  def('LogRocket', undefined);
 
   // FullStory
-  def('FS', noop); def('_fs_namespace', 'FS');
+  def('FS', undefined); def('_fs_namespace', undefined);
 
   // Mouseflow / CrazyEgg session replay
-  def('mouseflow', noopObj); def('_mfq', noopObj);
-  def('CE_API', noopObj);
+  def('mouseflow', undefined); def('_mfq', undefined);
+  def('CE_API', undefined);
 
   // Chartbeat
-  def('_sf_async_config', {}); def('pSUPERFLY', noopObj);
+  def('_sf_async_config', undefined); def('pSUPERFLY', undefined);
 
   // Quantcast
-  def('__qc', noopObj);
+  def('__qc', undefined);
 
   // Comscore
-  def('COMSCORE', { beacon: noop, purge: noop });
+  def('COMSCORE', undefined);
 
   // Block sendBeacon (tracker fallback)
   try { navigator.sendBeacon = function() { return true; }; } catch(e) {}
@@ -3404,7 +3401,7 @@ public partial class MainWindow : Window
         foreach (var pattern in _adBlockDomains)
             webView.CoreWebView2.AddWebResourceRequestedFilter(pattern, CoreWebView2WebResourceContext.All);
 
-        // Path-based patterns for banner images served from first-party domains
+        // Path-based patterns for banner images (including fetch context so fetchMediaSize is blocked)
         var adImagePaths = new[]
         {
             "*://*/ads/*", "*://*/ad/*", "*://*/adv/*",
@@ -3415,11 +3412,7 @@ public partial class MainWindow : Window
             "*://*ad-banner*", "*://*banner-ad*", "*://*adBanner*",
         };
         foreach (var p in adImagePaths)
-            webView.CoreWebView2.AddWebResourceRequestedFilter(p, CoreWebView2WebResourceContext.Image);
-
-        // Also block Flash/media ad resources at these paths
-        foreach (var p in adImagePaths)
-            webView.CoreWebView2.AddWebResourceRequestedFilter(p, CoreWebView2WebResourceContext.Media);
+            webView.CoreWebView2.AddWebResourceRequestedFilter(p, CoreWebView2WebResourceContext.All);
 
         webView.CoreWebView2.WebResourceRequested += (s, e) =>
         {
