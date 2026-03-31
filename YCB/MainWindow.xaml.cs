@@ -1328,7 +1328,8 @@ public partial class MainWindow : Window
                             telemetry_enabled = _settings.TelemetryEnabled.ToString().ToLower(),
                             user_id = ErrorReporter.UserId,
                             ai_enabled = _aiEnabled ? "on" : "off",
-                            quick_download_enabled = _settings.QuickDownloadEnabled ? "on" : "off"
+                            quick_download_enabled = _settings.QuickDownloadEnabled ? "on" : "off",
+                            ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off"
                         };
                         var settingsDataJson = JsonSerializer.Serialize(settingsData);
                         await webView.ExecuteScriptAsync($"window.loadSettings && window.loadSettings({settingsDataJson})");
@@ -1375,6 +1376,16 @@ public partial class MainWindow : Window
                                     if (el) el.style.display = 'none';
                                 })();
                             ");
+                        }
+                        break;
+
+                    default:
+                        // Inject ad blocker on real web pages
+                        if (_settings.AdBlockerEnabled)
+                        {
+                            var src = webView.Source?.ToString() ?? "";
+                            if (src.StartsWith("http://") || src.StartsWith("https://"))
+                                await webView.ExecuteScriptAsync(GetAdBlockerScript());
                         }
                         break;
                 }
@@ -3126,6 +3137,101 @@ public partial class MainWindow : Window
         catch { return raw; }
     }
 
+    private static string GetAdBlockerScript() => @"
+(function() {
+  'use strict';
+  // Ad selectors: Google Ads, common ad networks, generic ad containers
+  var AD_SELECTORS = [
+    'ins.adsbygoogle',
+    'ins[data-ad-client]',
+    'ins[data-ad-slot]',
+    '#google_ads_iframe_0',
+    '[id^=""google_ads_iframe""]',
+    '[id^=""google_ads_frame""]',
+    '[id^=""aswift_""]',
+    '[id^=""ad-""]',
+    '[id^=""ads-""]',
+    '[id$=""-ad""]',
+    '[id$=""-ads""]',
+    '[id=""ad""]',
+    '[id=""ads""]',
+    '[id=""advert""]',
+    '[id=""advertisement""]',
+    '[id=""ad-container""]',
+    '[id=""ad-wrapper""]',
+    '[id=""ad-banner""]',
+    '[id=""ad-unit""]',
+    '.adsbygoogle',
+    '.google-ad',
+    '.google-ads',
+    '.GoogleActiveViewElement',
+    '.ad-container',
+    '.ad-wrapper',
+    '.ad-banner',
+    '.ad-unit',
+    '.ad-slot',
+    '.ad-zone',
+    '.advertisement',
+    '.advertisement-block',
+    '.advert',
+    '.adverts',
+    '.sponsor-label',
+    '[data-ad-unit]',
+    '[data-ad-slot]',
+    '[data-ad-client]',
+    '[data-google-query-id]',
+    'iframe[src*=""googlesyndication.com""]',
+    'iframe[src*=""doubleclick.net""]',
+    'iframe[src*=""googleadservices.com""]',
+    'iframe[src*=""adnxs.com""]',
+    'iframe[src*=""amazon-adsystem.com""]',
+    'iframe[src*=""ads.yahoo.com""]',
+    'iframe[src*=""yieldmo.com""]',
+    'iframe[src*=""criteo.com""]',
+    'iframe[src*=""taboola.com""]',
+    'iframe[src*=""outbrain.com""]',
+    'iframe[src*=""revcontent.com""]',
+    'script[src*=""googlesyndication.com""]',
+    'script[src*=""doubleclick.net""]',
+    'div[id^=""taboola-""]',
+    'div[id^=""outbrain-""]',
+    '.taboola',
+    '.outbrain',
+    '.OUTBRAIN'
+  ].join(',');
+
+  function removeAds(root) {
+    try {
+      root.querySelectorAll(AD_SELECTORS).forEach(function(el) {
+        try { el.remove(); } catch(e) {}
+      });
+    } catch(e) {}
+  }
+
+  // Run immediately
+  removeAds(document);
+
+  // Watch for dynamically injected ads
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1) {
+          try {
+            if (node.matches && node.matches(AD_SELECTORS)) {
+              node.remove();
+            } else {
+              removeAds(node);
+            }
+          } catch(e) {}
+        }
+      });
+    });
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
+";
+
     private string? FindCopilotExe()
     {
         // Check common locations
@@ -4282,6 +4388,11 @@ public partial class MainWindow : Window
                 else
                     StopDlServer();
                 break;
+
+            case "ad_blocker_enabled":
+                _settings.AdBlockerEnabled = value == "on";
+                SaveSettings();
+                break;
         }
     }
     
@@ -4797,6 +4908,7 @@ public class Settings
     public double? WindowHeight { get; set; }
     public string? WindowState { get; set; }
     public bool QuickDownloadEnabled { get; set; } = false;
+    public bool AdBlockerEnabled { get; set; } = false;
 
 }
 

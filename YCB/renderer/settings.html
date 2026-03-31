@@ -356,7 +356,18 @@
           </div>
           <button class="toggle" id="toggle-quick-download"></button>
         </div>
-
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">Ad Blocker</div>
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="row-title">Ad Blocker</div>
+            <div class="row-desc">Remove Google ads, sponsored content, and common ad elements from web pages. Applies on every page load.</div>
+          </div>
+          <button class="toggle" id="toggle-ad-blocker"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -625,6 +636,18 @@
     });
   }
 
+  // ── Ad Blocker beta toggle ────────────────────────────────────────────────
+  const adBlockToggle = document.getElementById('toggle-ad-blocker');
+  if (adBlockToggle) {
+    adBlockToggle.classList.toggle('on', load('ad_blocker_enabled', 'off') === 'on');
+    adBlockToggle.addEventListener('click', () => {
+      const on = !adBlockToggle.classList.contains('on');
+      adBlockToggle.classList.toggle('on', on);
+      save('ad_blocker_enabled', on ? 'on' : 'off');
+      showToast(on ? 'Ad Blocker enabled — takes effect on next page load' : 'Ad Blocker disabled');
+    });
+  }
+
   // ── Load settings from C# backend ────────────────────────────────────────
   window.loadSettings = function(data) {
     if (!data) return;
@@ -699,6 +722,12 @@
       const on = data.quick_download_enabled === 'on';
       qdToggle.classList.toggle('on', on);
       localStorage.setItem('quick_download_enabled', data.quick_download_enabled);
+    }
+    // ad_blocker_enabled
+    if (data.ad_blocker_enabled !== undefined && adBlockToggle) {
+      const on = data.ad_blocker_enabled === 'on';
+      adBlockToggle.classList.toggle('on', on);
+      localStorage.setItem('ad_blocker_enabled', data.ad_blocker_enabled);
     }
 
   };
