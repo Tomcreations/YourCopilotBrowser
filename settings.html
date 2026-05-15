@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://raw.githubusercontent.com https://ycb.tomcreations.org;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://raw.githubusercontent.com;">
   <title>Settings - YCB</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1029,7 +1029,7 @@
 
   if (updateActionBtn) updateActionBtn.addEventListener('click', () => {
     if (!latestUpdateManifest) return;
-    const url = latestUpdateManifest.installer_url || latestUpdateManifest.installerUrl || 'https://ycb.tomcreations.org/static/downloads/YCB-Setup.zip';
+    const url = latestUpdateManifest.installer_url || latestUpdateManifest.installerUrl || 'https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.24/YCB-Setup.zip';
     if (window.chrome && window.chrome.webview) {
       window.chrome.webview.postMessage(JSON.stringify({ type: 'updates:openInstaller', url }));
     } else {
