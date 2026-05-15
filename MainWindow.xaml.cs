@@ -992,6 +992,10 @@ public partial class MainWindow : Window
                     tab.TabButton.Padding         = new Thickness(0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabTitle.Visibility       = Visibility.Collapsed;
+                    Grid.SetColumn(tab.TabFavicon, 0);
+                    Grid.SetColumnSpan(tab.TabFavicon, 4);
+                    Grid.SetColumn(tab.TabCloseBtn, 0);
+                    Grid.SetColumnSpan(tab.TabCloseBtn, 4);
                     if (showTinyClose)
                     {
                         tab.TabFavicon.Visibility  = Visibility.Collapsed;
@@ -1013,6 +1017,10 @@ public partial class MainWindow : Window
                 }
                 else if (compact)
                 {
+                    Grid.SetColumn(tab.TabFavicon, 0);
+                    Grid.SetColumnSpan(tab.TabFavicon, 1);
+                    Grid.SetColumn(tab.TabCloseBtn, 3);
+                    Grid.SetColumnSpan(tab.TabCloseBtn, 1);
                     tab.TabButton.Padding         = new Thickness(5, 0, 3, 0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabTitle.Visibility       = Visibility.Collapsed;
@@ -1026,6 +1034,10 @@ public partial class MainWindow : Window
                 }
                 else
                 {
+                    Grid.SetColumn(tab.TabFavicon, 0);
+                    Grid.SetColumnSpan(tab.TabFavicon, 1);
+                    Grid.SetColumn(tab.TabCloseBtn, 3);
+                    Grid.SetColumnSpan(tab.TabCloseBtn, 1);
                     // Normal: full padding, favicon + title + X on every tab.
                     tab.TabButton.Padding         = new Thickness(10, 0, 8, 0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
@@ -1260,6 +1272,7 @@ public partial class MainWindow : Window
                     {
                         UrlBox.Text = GetDisplayUrl(webView.Source?.ToString());
                         UpdateUrlPlaceholder();
+                        TryRefreshActiveUrlFavicon();
                         RefreshBookmarkStar();
                     });
                 }
@@ -1565,6 +1578,24 @@ public partial class MainWindow : Window
                 }
             }
         }
+    }
+
+    private void TryRefreshActiveUrlFavicon()
+    {
+        try
+        {
+            if (_activeTabIndex < 0 || _activeTabIndex >= _tabs.Count) return;
+            var core = _tabs[_activeTabIndex].WebView.CoreWebView2;
+            var faviconUri = core?.FaviconUri;
+            if (!string.IsNullOrWhiteSpace(faviconUri))
+            {
+                UpdateTabFavicon(_activeTabIndex, faviconUri);
+                return;
+            }
+        }
+        catch { }
+
+        UpdateUrlFaviconForActiveTab(clearIfMissing: true);
     }
 
     private void UpdateUrlFaviconForActiveTab(bool clearIfMissing = false)
