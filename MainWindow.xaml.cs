@@ -972,7 +972,7 @@ public partial class MainWindow : Window
         double tabWidth = Math.Min(220, Math.Max(20, available / _tabs.Count));
 
         // Three tiers matching Chrome behaviour:
-        //   tiny    : active tab shows X instead of favicon, inactive tabs show favicon only
+        //   tiny    : favicon only; the active tab swaps to centered X while hovered
         //   compact : favicon + X, no title
         //   normal  : favicon + title + X
         bool tiny = tabWidth <= 36;
@@ -988,21 +988,24 @@ public partial class MainWindow : Window
             {
                 if (tiny)
                 {
+                    bool showTinyClose = isActive && tab.TabButton.IsMouseOver;
                     tab.TabButton.Padding         = new Thickness(0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabTitle.Visibility       = Visibility.Collapsed;
-                    if (isActive)
+                    if (showTinyClose)
                     {
                         tab.TabFavicon.Visibility  = Visibility.Collapsed;
                         tab.TabCloseBtn.Visibility = Visibility.Visible;
                         tab.TabCloseBtn.Opacity    = 1;
                         tab.TabCloseBtn.HorizontalAlignment = HorizontalAlignment.Center;
+                        tab.TabCloseBtn.VerticalAlignment = VerticalAlignment.Center;
                         tab.TabCloseBtn.Margin = new Thickness(0);
                     }
                     else
                     {
                         tab.TabFavicon.Visibility  = Visibility.Visible;
                         tab.TabFavicon.HorizontalAlignment = HorizontalAlignment.Center;
+                        tab.TabFavicon.VerticalAlignment = VerticalAlignment.Center;
                         tab.TabFavicon.Margin = new Thickness(0);
                         tab.TabCloseBtn.Visibility = Visibility.Collapsed;
                         tab.TabCloseBtn.Opacity    = 0;
@@ -1139,9 +1142,9 @@ public partial class MainWindow : Window
         
         button.Content = grid;
         
-        // Close visibility is controlled by UpdateTabWidths so tiny tabs stay favicon-only unless active.
-        button.MouseEnter += (s, e) => { };
-        button.MouseLeave += (s, e) => { };
+        // Tiny tabs swap favicon <-> centered X only while hovering the active tab.
+        button.MouseEnter += (s, e) => UpdateTabWidths();
+        button.MouseLeave += (s, e) => UpdateTabWidths();
         
         button.Click += (s, e) =>
         {
