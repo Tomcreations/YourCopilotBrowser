@@ -121,6 +121,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>  <!-- Security icon -->
                         <ColumnDefinition Width="*"/>     <!-- Input -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Page favicon -->
                         <ColumnDefinition Width="Auto"/>  <!-- Bookmark -->
                     </Grid.ColumnDefinitions>
                     
@@ -152,7 +153,15 @@
                     </Grid>
                     
                     <!-- Bookmark Button -->
-                    <Button Grid.Column="2" x:Name="BookmarkBtn"
+                    <Image Grid.Column="2" x:Name="UrlFaviconImage"
+                           Width="16" Height="16"
+                           Margin="2,0,4,0"
+                           VerticalAlignment="Center"
+                           Visibility="Collapsed"
+                           IsHitTestVisible="False"/>
+
+                    <!-- Bookmark Button -->
+                    <Button Grid.Column="3" x:Name="BookmarkBtn"
                             Style="{StaticResource OmniBtnStyle}" 
                             Click="BookmarkBtn_Click"
                             ToolTip="Bookmark this tab" Margin="0,0,4,0">

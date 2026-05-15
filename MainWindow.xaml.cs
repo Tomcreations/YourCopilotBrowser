@@ -972,11 +972,11 @@ public partial class MainWindow : Window
         double tabWidth = Math.Min(220, Math.Max(20, available / _tabs.Count));
 
         // Three tiers matching Chrome behaviour:
-        //   icon-only  : width ≤ 36 — favicon only; active tab shows X instead (centered)
-        //   compact    : width ≤ 80 — favicon + no title; active tab shows X (favicon collapsed so X has room)
-        //   normal     : width  > 80 — favicon + title + X on active
-        bool iconOnly = tabWidth <= 36;
-        bool compact  = !iconOnly && tabWidth <= 80;
+        //   tiny    : active tab shows X instead of favicon, inactive tabs show favicon only
+        //   compact : favicon + X, no title
+        //   normal  : favicon + title + X
+        bool tiny = tabWidth <= 36;
+        bool compact  = !tiny && tabWidth <= 80;
 
         for (int i = 0; i < _tabs.Count; i++)
         {
@@ -986,19 +986,16 @@ public partial class MainWindow : Window
 
             if (tab.TabFavicon != null && tab.TabCloseBtn != null && tab.TabTitle != null)
             {
-                if (iconOnly)
+                if (tiny)
                 {
-                    // Icon-only: no padding, Stretch content so * column fills, X at right on active
                     tab.TabButton.Padding         = new Thickness(0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabTitle.Visibility       = Visibility.Collapsed;
                     if (isActive)
                     {
-                        // Collapse favicon (not Hidden) so it takes NO space → X sits at right with room
                         tab.TabFavicon.Visibility  = Visibility.Collapsed;
                         tab.TabCloseBtn.Visibility = Visibility.Visible;
                         tab.TabCloseBtn.Opacity    = 1;
-                        // Center the close button within the tab
                         tab.TabCloseBtn.HorizontalAlignment = HorizontalAlignment.Center;
                         tab.TabCloseBtn.Margin = new Thickness(0);
                     }
@@ -1013,28 +1010,28 @@ public partial class MainWindow : Window
                 }
                 else if (compact)
                 {
-                    // Compact: small padding, favicon (inactive) or X (active); title hidden
-                    tab.TabButton.Padding         = new Thickness(6, 0, 4, 0);
+                    tab.TabButton.Padding         = new Thickness(5, 0, 3, 0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabTitle.Visibility       = Visibility.Collapsed;
                     tab.TabCloseBtn.Visibility    = Visibility.Visible;
-                    tab.TabCloseBtn.Opacity       = isActive ? 1 : 0;
-                    // Collapse favicon on active (not Hidden) so X has room instead of being pushed off-screen
-                    tab.TabFavicon.Visibility     = isActive ? Visibility.Collapsed : Visibility.Visible;
-                    tab.TabFavicon.Margin         = new Thickness(0, 0, 6, 0);
+                    tab.TabCloseBtn.Opacity       = 1;
+                    tab.TabFavicon.Visibility     = Visibility.Visible;
+                    tab.TabFavicon.HorizontalAlignment = HorizontalAlignment.Left;
+                    tab.TabFavicon.Margin         = new Thickness(0, 0, 4, 0);
                     tab.TabCloseBtn.Margin        = new Thickness(0);
                     tab.TabCloseBtn.HorizontalAlignment = HorizontalAlignment.Right;
                 }
                 else
                 {
-                    // Normal: full padding, favicon + title + X on active (both favicon and X visible)
+                    // Normal: full padding, favicon + title + X on every tab.
                     tab.TabButton.Padding         = new Thickness(10, 0, 8, 0);
                     tab.TabButton.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                     tab.TabFavicon.Visibility     = Visibility.Visible;
+                    tab.TabFavicon.HorizontalAlignment = HorizontalAlignment.Left;
                     tab.TabFavicon.Margin         = new Thickness(0, 0, 6, 0);
                     tab.TabTitle.Visibility       = Visibility.Visible;
                     tab.TabCloseBtn.Visibility    = Visibility.Visible;
-                    tab.TabCloseBtn.Opacity       = isActive ? 1 : 0;
+                    tab.TabCloseBtn.Opacity       = 1;
                     tab.TabCloseBtn.Margin        = new Thickness(4, 0, 0, 0);
                     tab.TabCloseBtn.HorizontalAlignment = HorizontalAlignment.Right;
                 }
@@ -1124,7 +1121,7 @@ public partial class MainWindow : Window
             Cursor = Cursors.Hand,
             Margin = new Thickness(4, 0, 0, 0),
             Tag = index,
-            Opacity = 0,
+            Opacity = 1,
             Style = (Style)FindResource("TabCloseBtnStyle")
         };
         closeBtn.Content = new WpfPath
@@ -1142,9 +1139,9 @@ public partial class MainWindow : Window
         
         button.Content = grid;
         
-        // X button is only ever visible on the ACTIVE tab — no hover reveal on inactive tabs
-        button.MouseEnter += (s, e) => { /* no-op: X stays driven by active state only */ };
-        button.MouseLeave += (s, e) => { /* no-op */ };
+        // Close visibility is controlled by UpdateTabWidths so tiny tabs stay favicon-only unless active.
+        button.MouseEnter += (s, e) => { };
+        button.MouseLeave += (s, e) => { };
         
         button.Click += (s, e) =>
         {
@@ -1200,7 +1197,12 @@ public partial class MainWindow : Window
         {
             var startingIdx = GetTabIndexForWebView(webView);
             if (startingIdx >= 0 && startingIdx < _tabs.Count)
+            {
                 _tabs[startingIdx].IsSuspended = false;
+                var startingTitle = GetLoadingTabTitle(e.Uri);
+                _tabs[startingIdx].Title = startingTitle;
+                UpdateTabTitle(startingIdx, startingTitle);
+            }
             SuggestPopup.IsOpen = false;
             _navStartTimes[webView] = DateTime.UtcNow;
             _autofillShownForTab.Remove(webView);
@@ -1221,6 +1223,7 @@ public partial class MainWindow : Window
                 UpdateUrlPlaceholder();
                 UpdateSecurityIcon(e.Uri);
                 UpdateRefreshButton();
+                UpdateUrlFaviconForActiveTab(clearIfMissing: true);
             }
 
             // Silent login: intercept the support site login page,
@@ -1388,6 +1391,11 @@ public partial class MainWindow : Window
             var idx = GetTabIndexForWebView(webView);
             if (idx >= 0 && idx < _tabs.Count)
                 _tabs[idx].Url = IsInternalVirtualUrl(src) ? VirtualInternalUrlToYcbUrl(src) : src;
+            if (idx >= 0 && idx < _tabs.Count && string.IsNullOrWhiteSpace(_tabs[idx].Title))
+            {
+                _tabs[idx].Title = GetLoadingTabTitle(src);
+                UpdateTabTitle(idx, _tabs[idx].Title);
+            }
         };
         
         webView.CoreWebView2.DocumentTitleChanged += (s, e) =>
@@ -1396,6 +1404,8 @@ public partial class MainWindow : Window
             if (idx >= 0 && idx < _tabs.Count)
             {
                 var title = webView.CoreWebView2.DocumentTitle;
+                if (string.IsNullOrWhiteSpace(title))
+                    title = GetLoadingTabTitle(webView.Source?.ToString());
                 _tabs[idx].Title = title;
                 UpdateTabTitle(idx, title);
                 AddToHistory(webView.Source?.ToString(), title);
@@ -1543,11 +1553,46 @@ public partial class MainWindow : Window
                         bitmap.UriSource = new Uri(faviconUrl);
                         bitmap.CacheOption = BitmapCacheOption.OnLoad;
                         bitmap.EndInit();
+                        if (bitmap.CanFreeze) bitmap.Freeze();
                         image.Source = bitmap;
+                        if (index == _activeTabIndex)
+                            UpdateUrlFaviconForActiveTab();
                     }
                     catch { }
                 }
             }
+        }
+    }
+
+    private void UpdateUrlFaviconForActiveTab(bool clearIfMissing = false)
+    {
+        try
+        {
+            if (_activeTabIndex < 0 || _activeTabIndex >= _tabs.Count)
+            {
+                UrlFaviconImage.Source = null;
+                UrlFaviconImage.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var source = _tabs[_activeTabIndex].TabFavicon?.Source;
+            if (source != null)
+            {
+                UrlFaviconImage.Source = source;
+                UrlFaviconImage.Visibility = Visibility.Visible;
+                return;
+            }
+
+            if (clearIfMissing)
+            {
+                UrlFaviconImage.Source = null;
+                UrlFaviconImage.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch
+        {
+            UrlFaviconImage.Source = null;
+            UrlFaviconImage.Visibility = Visibility.Collapsed;
         }
     }
     
@@ -1605,7 +1650,6 @@ public partial class MainWindow : Window
             {
                 t.WebView.Visibility = Visibility.Collapsed;
                 t.TabButton.Style    = (Style)FindResource(inactiveStyle);
-                if (t.TabCloseBtn != null) t.TabCloseBtn.Opacity = 0;
                 if (t.TabTitle != null)
                     t.TabTitle.Foreground = new SolidColorBrush(
                         (Color)ColorConverter.ConvertFromString(inactiveTitleColor)!);
@@ -1621,7 +1665,6 @@ public partial class MainWindow : Window
         ResumeTab(_tabs[index]);
         _tabs[index].WebView.Visibility  = Visibility.Visible;
         _tabs[index].TabButton.Style     = (Style)FindResource(activeStyle);
-        if (_tabs[index].TabCloseBtn != null) _tabs[index].TabCloseBtn.Opacity = 1;
         if (_tabs[index].TabTitle != null)
             _tabs[index].TabTitle.Foreground = new SolidColorBrush(
                 (Color)ColorConverter.ConvertFromString(activeTitleColor)!);
@@ -1645,7 +1688,9 @@ public partial class MainWindow : Window
         
         UpdateNavButtons();
         UpdateRefreshButton();
+        UpdateUrlFaviconForActiveTab(clearIfMissing: true);
         RefreshBookmarkStar();
+        UpdateTabWidths();
         QueueInactiveTabTrim();
     }
 
@@ -5071,6 +5116,29 @@ FROM cookies";
         }
         
         return url;
+    }
+
+    private string GetLoadingTabTitle(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "New Tab";
+
+        var systemName = GetSystemPageName(url);
+        if (!string.IsNullOrWhiteSpace(systemName)) return systemName;
+        if (url.StartsWith("ycb://newtab", StringComparison.OrdinalIgnoreCase) ||
+            url.Contains("newtab.html", StringComparison.OrdinalIgnoreCase))
+            return "New Tab";
+
+        try
+        {
+            var uri = new Uri(url);
+            if (!string.IsNullOrWhiteSpace(uri.Host))
+                return uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+                    ? uri.Host[4..]
+                    : uri.Host;
+        }
+        catch { }
+
+        return "New Tab";
     }
 
     private static bool IsInternalVirtualUrl(string? url)
