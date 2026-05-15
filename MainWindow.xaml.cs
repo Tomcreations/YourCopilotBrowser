@@ -1421,7 +1421,7 @@ public partial class MainWindow : Window
             {
                 var title = webView.CoreWebView2.DocumentTitle;
                 if (string.IsNullOrWhiteSpace(title))
-                    title = GetLoadingTabTitle(webView.Source?.ToString());
+                    title = GetLoadingTabTitle(webView.Source?.ToString(), useHostFallback: false);
                 title = NormalizeTabTitle(title, webView.Source?.ToString());
                 _tabs[idx].Title = title;
                 UpdateTabTitle(idx, title);
@@ -1585,8 +1585,8 @@ public partial class MainWindow : Window
     private string NormalizeTabTitle(string? title, string? url)
     {
         var clean = (title ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(clean) || LooksLikeUrl(clean))
-            return GetLoadingTabTitle(url);
+        if (string.IsNullOrWhiteSpace(clean) || LooksLikeUrl(clean) || string.Equals(clean, GetHostLabel(url), StringComparison.OrdinalIgnoreCase))
+            return GetLoadingTabTitle(url, useHostFallback: false);
         return clean;
     }
 
@@ -5277,7 +5277,7 @@ FROM cookies";
         return url;
     }
 
-    private string GetLoadingTabTitle(string? url)
+    private string GetLoadingTabTitle(string? url, bool useHostFallback = true)
     {
         if (string.IsNullOrWhiteSpace(url)) return "New Tab";
 
@@ -5290,14 +5290,16 @@ FROM cookies";
         try
         {
             var uri = new Uri(url);
-            if (!string.IsNullOrWhiteSpace(uri.Host))
+            if (IsGoogleSearchUrl(url, out var searchQuery))
+                return string.IsNullOrWhiteSpace(searchQuery) ? "Google Search" : $"{searchQuery} - Google Search";
+            if (useHostFallback && !string.IsNullOrWhiteSpace(uri.Host))
                 return uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
                     ? uri.Host[4..]
                     : uri.Host;
         }
         catch { }
 
-        return "New Tab";
+        return "Loading...";
     }
 
     private static bool IsInternalVirtualUrl(string? url)
