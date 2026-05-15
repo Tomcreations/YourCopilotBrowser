@@ -1422,6 +1422,7 @@ public partial class MainWindow : Window
                 var title = webView.CoreWebView2.DocumentTitle;
                 if (string.IsNullOrWhiteSpace(title))
                     title = GetLoadingTabTitle(webView.Source?.ToString());
+                title = NormalizeTabTitle(title, webView.Source?.ToString());
                 _tabs[idx].Title = title;
                 UpdateTabTitle(idx, title);
                 AddToHistory(webView.Source?.ToString(), title);
@@ -1540,6 +1541,7 @@ public partial class MainWindow : Window
     {
         if (index >= 0 && index < _tabs.Count)
         {
+            title = NormalizeTabTitle(title, _tabs[index].Url);
             var button = _tabs[index].TabButton;
             if (button?.Content is Grid grid)
             {
@@ -1578,6 +1580,14 @@ public partial class MainWindow : Window
                 }
             }
         }
+    }
+
+    private string NormalizeTabTitle(string? title, string? url)
+    {
+        var clean = (title ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(clean) || LooksLikeUrl(clean))
+            return GetLoadingTabTitle(url);
+        return clean;
     }
 
     private void TryRefreshActiveUrlFavicon()
@@ -4958,10 +4968,12 @@ FROM cookies";
                 .Take(3)
                 .Select(h => new OmniSuggestion
                 {
-                    Primary = h.Url,
-                    Secondary = h.Title,
+                    Primary = GetSuggestionPrimary(h),
+                    Secondary = GetSuggestionSecondary(h),
                     NavigateUrl = h.Url,
-                    IsHistory = true
+                    Kind = IsSearchHistoryItem(h) ? OmniSuggestionKind.History : OmniSuggestionKind.Site,
+                    FaviconUrl = GetFaviconServiceUrl(h.Url),
+                    IsRemovable = true
                 });
             suggestions.AddRange(historyMatches);
 
@@ -4982,7 +4994,7 @@ FROM cookies";
                     {
                         Primary = text,
                         NavigateUrl = GetSearchUrl(text),
-                        IsHistory = false
+                        Kind = OmniSuggestionKind.Search
                     });
                 }
             }
@@ -5033,6 +5045,119 @@ FROM cookies";
         Navigate(s.NavigateUrl);
         if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Count)
             _tabs[_activeTabIndex].WebView.Focus();
+    }
+
+    private void RemoveSuggestion_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: OmniSuggestion suggestion }) return;
+        if (string.IsNullOrWhiteSpace(suggestion.NavigateUrl)) return;
+        try
+        {
+            var history = LoadHistory();
+            history.RemoveAll(h => string.Equals(h.Url, suggestion.NavigateUrl, StringComparison.OrdinalIgnoreCase));
+            File.WriteAllText(_historyPath, JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true }));
+            _ = UpdateSuggestionsAsync(UrlBox.Text);
+        }
+        catch { }
+    }
+
+    private static string GetSuggestionPrimary(HistoryItem item)
+    {
+        var title = (item.Title ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(title) && !LooksLikeUrl(title))
+            return title;
+
+        if (IsGoogleSearchUrl(item.Url, out var query))
+            return query;
+
+        return GetFriendlyUrlLabel(item.Url);
+    }
+
+    private static string GetSuggestionSecondary(HistoryItem item)
+    {
+        if (IsGoogleSearchUrl(item.Url, out _))
+            return "Google Search";
+
+        var host = GetHostLabel(item.Url);
+        var title = (item.Title ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(title) && !LooksLikeUrl(title) && !string.Equals(title, host, StringComparison.OrdinalIgnoreCase))
+            return $"{host} - {GetShortUrl(item.Url)}";
+
+        return GetShortUrl(item.Url);
+    }
+
+    private static bool IsSearchHistoryItem(HistoryItem item)
+    {
+        if (IsGoogleSearchUrl(item.Url, out _)) return true;
+        return string.Equals((item.Title ?? "").Trim(), (item.Url ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetFaviconServiceUrl(string? url)
+    {
+        var host = GetHostLabel(url);
+        return string.IsNullOrWhiteSpace(host)
+            ? ""
+            : $"https://www.google.com/s2/favicons?domain={Uri.EscapeDataString(host)}&sz=32";
+    }
+
+    private static bool IsGoogleSearchUrl(string? url, out string query)
+    {
+        query = "";
+        try
+        {
+            var uri = new Uri(url ?? "");
+            if (!uri.Host.Contains("google.", StringComparison.OrdinalIgnoreCase)) return false;
+            var q = uri.Query.TrimStart('?')
+                .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Split('=', 2))
+                .Where(parts => parts.Length == 2 && string.Equals(parts[0], "q", StringComparison.OrdinalIgnoreCase))
+                .Select(parts => Uri.UnescapeDataString(parts[1].Replace("+", " ")))
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(q)) return false;
+            query = q;
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static bool LooksLikeUrl(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        return Uri.TryCreate(text, UriKind.Absolute, out _) ||
+               text.StartsWith("www.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetHostLabel(string? url)
+    {
+        try
+        {
+            var host = new Uri(url ?? "").Host;
+            return host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
+        }
+        catch { return ""; }
+    }
+
+    private static string GetFriendlyUrlLabel(string? url)
+    {
+        var host = GetHostLabel(url);
+        return string.IsNullOrWhiteSpace(host) ? (url ?? "") : host;
+    }
+
+    private static string GetShortUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "";
+        try
+        {
+            var uri = new Uri(url);
+            var host = uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
+            var path = uri.PathAndQuery.TrimEnd('/');
+            var shortPath = path.Length > 34 ? path[..34] + "..." : path;
+            return string.IsNullOrWhiteSpace(shortPath) || shortPath == "/" ? host : $"{host}{shortPath}";
+        }
+        catch
+        {
+            return url.Length > 46 ? url[..46] + "..." : url;
+        }
     }
 
     private void SuggestionsList_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -10713,22 +10838,47 @@ public class ChatMessage
     public string Content { get; set; } = "";
 }
 
+public enum OmniSuggestionKind
+{
+    Search,
+    History,
+    Site
+}
+
 public class OmniSuggestion
 {
     public string Primary { get; set; } = "";
     public string Secondary { get; set; } = "";
     public string NavigateUrl { get; set; } = "";
-    public bool IsHistory { get; set; }
+    public OmniSuggestionKind Kind { get; set; } = OmniSuggestionKind.Search;
+    public string FaviconUrl { get; set; } = "";
+    public bool IsRemovable { get; set; }
 
     // Search magnifier icon
     private const string SearchPath = "M10.5 10.5 L14 14 M9 15 C12.3137 15 15 12.3137 15 9 C15 5.68629 12.3137 3 9 3 C5.68629 3 3 5.68629 3 9 C3 12.3137 5.68629 15 9 15 Z";
     // Clock/history icon
     private const string HistoryPath = "M8 2 C4.686 2 2 4.686 2 8 C2 11.314 4.686 14 8 14 C11.314 14 14 11.314 14 8 C14 4.686 11.314 2 8 2 Z M8 5 L8 8.5 L11 10";
 
-    public string IconPath => IsHistory ? HistoryPath : SearchPath;
-    public string IconColor => IsHistory
+    public string IconPath => Kind == OmniSuggestionKind.History ? HistoryPath : SearchPath;
+    public string IconColor => Kind == OmniSuggestionKind.History
         ? (IsDark ? "#8ab4f8" : "#1a73e8")
         : (IsDark ? "#9aa0a6" : "#5f6368");
+    public System.Windows.Visibility FaviconVisibility =>
+        Kind == OmniSuggestionKind.Site && !string.IsNullOrWhiteSpace(FaviconUrl)
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility VectorIconVisibility =>
+        FaviconVisibility == System.Windows.Visibility.Visible
+            ? System.Windows.Visibility.Collapsed
+            : System.Windows.Visibility.Visible;
+    public System.Windows.Visibility RemoveVisibility =>
+        IsRemovable ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public System.Windows.Media.Brush IconBackBrush =>
+        Kind == OmniSuggestionKind.Site
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(IsDark ? "#303134" : "#e8f0fe")!)
+            : Brushes.Transparent;
+    public FontWeight PrimaryWeight =>
+        Kind == OmniSuggestionKind.Search ? FontWeights.SemiBold : FontWeights.Normal;
 
     // Static theme flag — updated by ApplyTheme() before populating suggestions
     public static bool IsDark { get; set; } = true;

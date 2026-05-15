@@ -677,22 +677,38 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid>
+                            <Grid MinHeight="34">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="34"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Viewbox Grid.Column="0" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border Grid.Column="0" Width="26" Height="26" CornerRadius="6"
+                                        Background="{Binding IconBackBrush}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Image Width="18" Height="18" Source="{Binding FaviconUrl}"
+                                           Visibility="{Binding FaviconVisibility}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Viewbox Grid.Column="0" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                         Visibility="{Binding VectorIconVisibility}">
                                     <Canvas Width="16" Height="16">
                                         <Path Data="{Binding IconPath}" Stroke="{Binding IconColor}" Fill="Transparent"
                                               StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
                                     </Canvas>
                                 </Viewbox>
-                                <StackPanel Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Primary}" FontSize="13" Foreground="{Binding PrimaryColor}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Secondary}" FontSize="11" Foreground="{Binding SecondaryColor}" TextTrimming="CharacterEllipsis"
-                                               Visibility="{Binding SecondaryVisibility}"/>
+                                <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Primary}" FontSize="13.5" FontWeight="{Binding PrimaryWeight}"
+                                               Foreground="{Binding PrimaryColor}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Secondary}" FontSize="11.5" Foreground="{Binding SecondaryColor}"
+                                               TextTrimming="CharacterEllipsis" Visibility="{Binding SecondaryVisibility}"/>
                                 </StackPanel>
+                                <Button Grid.Column="2" Width="28" Height="28" Background="Transparent" BorderThickness="0"
+                                        Visibility="{Binding RemoveVisibility}" ToolTip="Remove suggestion"
+                                        Click="RemoveSuggestion_Click" Tag="{Binding}">
+                                    <Path Data="M1 1l8 8M9 1l-8 8" Stroke="{Binding SecondaryColor}" StrokeThickness="1.5"
+                                          Width="10" Height="10" Stretch="Uniform"/>
+                                </Button>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
