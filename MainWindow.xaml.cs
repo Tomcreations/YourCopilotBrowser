@@ -41,6 +41,8 @@ public partial class MainWindow : Window
     // Rapid-close: while mouse is over the tab strip, don't resize tabs (Chrome behaviour)
     private bool _tabStripMouseOver = false;
     private bool _tabsClosedWhileOver = false;
+    private bool _suppressTabWidthUpdate = false;
+    private System.Windows.Threading.DispatcherTimer? _tabCloseResizeTimer;
     private readonly HashSet<string> _adBlockLoggedHosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _installedBrowserExtensionProfiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<WebView2> _loadingTabs = new();
@@ -64,7 +66,7 @@ public partial class MainWindow : Window
     private string _extensionsStatePath = "";
     private string _bitwardenCliAppDataDir = "";
     private string _sessionPath = "";
-    private const string EmbeddedContentStamp = "2026-05-15-url-launch-ram-v21";
+    private const string EmbeddedContentStamp = "2026-05-16-searchbar-icons-v23";
     private const string InternalHostName = "ycb.local";
     private const string InternalOrigin = "https://ycb.local/";
     private Settings _settings = new();
@@ -148,7 +150,7 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) => { if (!_isFullscreen && Top < 0) Top = 0; };
         StateChanged += MainWindow_StateChanged;
         KeyDown += MainWindow_KeyDown;
-        SizeChanged += (_, _) => UpdateTabWidths();
+        SizeChanged += (_, _) => QueueTabWidthUpdate();
         // Track mouse over the ENTIRE tab strip — only resize on leave if tabs were actually closed
         Loaded += (_, _) =>
         {
@@ -159,7 +161,7 @@ public partial class MainWindow : Window
                 if (_tabsClosedWhileOver)
                 {
                     _tabsClosedWhileOver = false;
-                    UpdateTabWidths(); // resize now that cursor has left after rapid-close
+                    QueueTabWidthUpdate();
                 }
             };
         };
@@ -1582,6 +1584,29 @@ public partial class MainWindow : Window
         }
     }
 
+    private void QueueTabWidthUpdate()
+    {
+        if (_tabs.Count == 0) return;
+        _tabCloseResizeTimer ??= CreateTabCloseResizeTimer();
+        _tabCloseResizeTimer.Stop();
+        _tabCloseResizeTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateTabCloseResizeTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(1500)
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (!_suppressTabWidthUpdate)
+                UpdateTabWidths();
+        };
+        return timer;
+    }
+
     private string NormalizeTabTitle(string? title, string? url)
     {
         var clean = (title ?? "").Trim();
@@ -1734,7 +1759,8 @@ public partial class MainWindow : Window
         UpdateRefreshButton();
         UpdateUrlFaviconForActiveTab(clearIfMissing: true);
         RefreshBookmarkStar();
-        UpdateTabWidths();
+        if (!_suppressTabWidthUpdate)
+            UpdateTabWidths();
         QueueInactiveTabTrim();
     }
 
@@ -1857,13 +1883,20 @@ public partial class MainWindow : Window
         else if (_activeTabIndex == index)
             _activeTabIndex = Math.Max(0, index - 1);
         
-        SwitchToTab(_activeTabIndex);
-        // Don't resize while mouse is still over the tab strip — lets user rapidly click X
-        // (tabs resize when mouse leaves the strip via TabStrip.MouseLeave)
-        if (_tabStripMouseOver)
-            _tabsClosedWhileOver = true;
-        else
-            UpdateTabWidths();
+        _suppressTabWidthUpdate = true;
+        try
+        {
+            SwitchToTab(_activeTabIndex);
+        }
+        finally
+        {
+            _suppressTabWidthUpdate = false;
+        }
+
+        // Chrome-like rapid close: keep tab widths stable while the user is
+        // repeatedly clicking X, then resize 1.5s after the last close.
+        if (_tabStripMouseOver) _tabsClosedWhileOver = true;
+        QueueTabWidthUpdate();
     }
     
     private void UpdateNavButtons()
@@ -2619,23 +2652,6 @@ public partial class MainWindow : Window
                     if (sender is CoreWebView2 bwStateWv)
                     {
                         await SendBitwardenStateAsync(bwStateWv);
-                    }
-                    break;
-
-                case "cookies:getProfiles":
-                    if (sender is CoreWebView2 cookieProfilesWv)
-                    {
-                        var browser = message.TryGetValue("browser", out var cookieBrowserEl) ? cookieBrowserEl.GetString() : "chrome";
-                        await SendCookieImportProfilesAsync(cookieProfilesWv, browser ?? "chrome");
-                    }
-                    break;
-
-                case "cookies:import":
-                    if (sender is CoreWebView2 cookieImportWv)
-                    {
-                        var browser = message.TryGetValue("browser", out var cookieBrowserImportEl) ? cookieBrowserImportEl.GetString() : "chrome";
-                        var profile = message.TryGetValue("profile", out var cookieProfileEl) ? cookieProfileEl.GetString() : "";
-                        await ImportCookiesIntoCurrentProfileAsync(cookieImportWv, browser ?? "chrome", profile ?? "");
                     }
                     break;
 
