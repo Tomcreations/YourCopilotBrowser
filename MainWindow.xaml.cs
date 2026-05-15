@@ -2934,6 +2934,23 @@ public partial class MainWindow : Window
                     }
                     break;
 
+                case "updates:getManifest":
+                    if (sender is CoreWebView2 updateWv)
+                    {
+                        try
+                        {
+                            var manifestJson = await ResolveUpdateManifestJsonAsync();
+                            var safeManifest = JsonSerializer.Serialize(manifestJson);
+                            await updateWv.ExecuteScriptAsync($"window.loadUpdateManifest && window.loadUpdateManifest({safeManifest})");
+                        }
+                        catch (Exception ex)
+                        {
+                            var safeError = JsonSerializer.Serialize(ex.Message);
+                            await updateWv.ExecuteScriptAsync($"window.loadUpdateManifestError && window.loadUpdateManifestError({safeError})");
+                        }
+                    }
+                    break;
+
                 case "setDefault":
                     await Dispatcher.InvokeAsync(() => SetAsDefaultBrowser());
                     break;
@@ -10608,6 +10625,19 @@ FROM cookies";
                 break;
 
         }
+    }
+
+    private async Task<string> ResolveUpdateManifestJsonAsync()
+    {
+        const string manifestUrl = "https://raw.githubusercontent.com/Tomcreations/YourCopilotBrowser/main/update.json";
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        var resp = await http.GetAsync(manifestUrl);
+        if (!resp.IsSuccessStatusCode)
+            throw new HttpRequestException($"GitHub returned HTTP {(int)resp.StatusCode}");
+        var remote = await resp.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(remote))
+            throw new HttpRequestException("GitHub update manifest was empty");
+        return remote;
     }
     
     private void UpdateBookmarksBar()
