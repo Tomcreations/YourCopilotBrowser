@@ -10,8 +10,8 @@
     <AssemblyName>YCB</AssemblyName>
     <Product>YCB Browser</Product>
     <Company>YCB</Company>
-    <Description>YCB Browser - A modern WebView2-based browser with profiles, extensions, ad blocking, and supported AI services</Description>
-    <Version>1.0.0</Version>
+    <Description>YCB Browser - A modern WebView2-based browser with Copilot integration</Description>
+    <Version>1.0.24</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

@@ -66,7 +66,8 @@ public partial class MainWindow : Window
     private string _extensionsStatePath = "";
     private string _bitwardenCliAppDataDir = "";
     private string _sessionPath = "";
-    private const string EmbeddedContentStamp = "2026-05-16-searchbar-icons-v23";
+    private const string AppVersion = "1.0.24";
+    private const string EmbeddedContentStamp = "2026-05-16-updater-v24";
     private const string InternalHostName = "ycb.local";
     private const string InternalOrigin = "https://ycb.local/";
     private Settings _settings = new();
@@ -2158,7 +2159,8 @@ public partial class MainWindow : Window
                             profile_initial = _settings.ProfileInitial,
                             profile_color = _settings.ProfileColor,
                             ad_blocker_enabled = _settings.AdBlockerEnabled ? "on" : "off",
-                            home_page = _settings.HomePage ?? "ycb://newtab"
+                            home_page = _settings.HomePage ?? "ycb://newtab",
+                            app_version = AppVersion
                         };
                         var settingsDataJson = JsonSerializer.Serialize(settingsData);
                         await webView.ExecuteScriptAsync($"window.loadSettings && window.loadSettings({settingsDataJson})");
@@ -2918,6 +2920,17 @@ public partial class MainWindow : Window
                                 }};
                             }})();
                         ");
+                    }
+                    break;
+
+                case "updates:openInstaller":
+                    if (message.TryGetValue("url", out var updateUrlElement))
+                    {
+                        var updateUrl = updateUrlElement.GetString();
+                        if (!string.IsNullOrWhiteSpace(updateUrl))
+                        {
+                            await Dispatcher.InvokeAsync(() => _ = CreateTab(updateUrl));
+                        }
                     }
                     break;
 

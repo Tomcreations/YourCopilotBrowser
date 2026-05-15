@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://raw.githubusercontent.com https://ycb.tomcreations.org;">
   <title>Settings - YCB</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -209,6 +209,7 @@
     <a class="nav-item" data-section="appearance"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v10l4.5 4.5"/></svg></span>Appearance</a>
     <a class="nav-item" data-section="search"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>Search engine</a>
     <a class="nav-item" data-section="default"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></span>Default browser</a>
+    <a class="nav-item" data-section="updates"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></span>Updates</a>
     <a class="nav-item" data-section="startup"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>On startup</a>
     <div class="nav-break"></div>
     <a class="nav-item" data-section="ycb"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="6"/><path d="M8 16c-2.5 1-4 2.5-4 4h16c0-1.5-1.5-3-4-4"/></svg></span>Browser service</a>
@@ -352,6 +353,37 @@
             <div class="row-desc" id="default-status">Checking status...</div>
           </div>
           <button class="btn btn-primary" id="btn-set-default">Set as default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Updates -->
+  <div id="section-updates" style="display:none">
+    <div class="page-title">Updates</div>
+    <div class="page-sub">YCB checks the GitHub source repo for the latest stable update notes.</div>
+    <div class="section">
+      <div class="card">
+        <div class="row" style="align-items:flex-start">
+          <div class="row-left">
+            <div class="row-title" id="update-status-title">Checking for updates...</div>
+            <div class="row-desc" id="update-status-desc">Installed version: <span id="installed-version">checking...</span></div>
+          </div>
+          <button class="btn btn-primary" id="update-action-btn" type="button" disabled>Checking</button>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div class="row-left">
+            <div class="row-title">What this update is about</div>
+            <div class="row-desc" id="update-summary">Loading the update file from GitHub...</div>
+            <ul id="update-changes" style="margin:12px 0 0 18px;color:var(--text);line-height:1.65;font-size:13px"></ul>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Update source</div>
+            <div class="row-desc">Manifest: GitHub repo update file. Installer: official YCB download.</div>
+          </div>
+          <button class="btn btn-outline" id="update-recheck-btn" type="button">Check again</button>
         </div>
       </div>
     </div>
@@ -506,7 +538,7 @@
         <div class="row" style="flex-direction:column;align-items:flex-start;gap:10px;border:none;padding:22px 20px">
           <div style="font-size:32px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></div>
           <div class="about-version">YCB Browser</div>
-          <div style="font-size:13px;color:var(--text2)">Version 1.0.0 - Built on WebView2</div>
+          <div style="font-size:13px;color:var(--text2)">Version <span id="about-version-number">checking...</span> - Built on WebView2</div>
           <div style="font-size:13px;color:var(--text2);line-height:1.6">
             Powered by <strong style="color:var(--text)">web services</strong><br>
             Provider: <code style="color:var(--accent);background:rgba(138,180,248,0.1);padding:2px 8px;border-radius:4px" id="about-provider">ChatGPT</code>
@@ -599,7 +631,7 @@
   applySettingsTheme(currentThemeOnLoad);
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  const sections = ['profile','appearance','search','default','startup','ycb','privacy','extensions','beta','about'];
+  const sections = ['profile','appearance','search','default','updates','startup','ycb','privacy','extensions','beta','about'];
   const navItems = document.querySelectorAll('.nav-item');
 
   function showSection(name) {
@@ -899,6 +931,106 @@
     showToast('Opening Default Apps settings…');
   });
 
+  // ── Updates ──────────────────────────────────────────────────────────────
+  const updateManifestUrl = 'https://raw.githubusercontent.com/Tomcreations/YourCopilotBrowser/main/update.json';
+  const updateStatusTitle = document.getElementById('update-status-title');
+  const updateStatusDesc = document.getElementById('update-status-desc');
+  const installedVersionEl = document.getElementById('installed-version');
+  const aboutVersionEl = document.getElementById('about-version-number');
+  const updateSummary = document.getElementById('update-summary');
+  const updateChanges = document.getElementById('update-changes');
+  const updateActionBtn = document.getElementById('update-action-btn');
+  const updateRecheckBtn = document.getElementById('update-recheck-btn');
+  let installedVersion = load('app_version', '1.0.0');
+  let latestUpdateManifest = null;
+
+  function compareVersions(a, b) {
+    const pa = String(a || '0').split('.').map(n => parseInt(n, 10) || 0);
+    const pb = String(b || '0').split('.').map(n => parseInt(n, 10) || 0);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const av = pa[i] || 0;
+      const bv = pb[i] || 0;
+      if (av > bv) return 1;
+      if (av < bv) return -1;
+    }
+    return 0;
+  }
+
+  function setInstalledVersion(version) {
+    installedVersion = version || installedVersion;
+    localStorage.setItem('app_version', installedVersion);
+    if (installedVersionEl) installedVersionEl.textContent = installedVersion;
+    if (aboutVersionEl) aboutVersionEl.textContent = installedVersion;
+  }
+
+  function renderUpdateManifest(manifest) {
+    latestUpdateManifest = manifest || null;
+    const latest = manifest && manifest.version ? String(manifest.version) : '';
+    const summary = manifest && manifest.summary ? String(manifest.summary) : 'No update notes were provided.';
+    const changes = Array.isArray(manifest && manifest.changes) ? manifest.changes : [];
+    const isNewer = latest && compareVersions(latest, installedVersion) > 0;
+
+    if (updateSummary) updateSummary.textContent = summary;
+    if (updateChanges) {
+      updateChanges.innerHTML = '';
+      changes.forEach(change => {
+        const li = document.createElement('li');
+        li.textContent = String(change);
+        updateChanges.appendChild(li);
+      });
+    }
+
+    if (updateStatusTitle) {
+      updateStatusTitle.textContent = isNewer
+        ? `Update available: YCB ${latest}`
+        : `You're up to date: YCB ${installedVersion}`;
+    }
+    if (updateStatusDesc) {
+      updateStatusDesc.innerHTML = `Installed version: <span id="installed-version">${installedVersion}</span>` +
+        (latest ? ` · Latest version: ${latest}` : '');
+    }
+    if (updateActionBtn) {
+      updateActionBtn.disabled = !isNewer;
+      updateActionBtn.textContent = isNewer ? 'Update now' : 'Up to date';
+    }
+  }
+
+  async function checkForUpdates() {
+    if (updateStatusTitle) updateStatusTitle.textContent = 'Checking for updates...';
+    if (updateActionBtn) {
+      updateActionBtn.disabled = true;
+      updateActionBtn.textContent = 'Checking';
+    }
+    try {
+      const response = await fetch(updateManifestUrl, { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const manifest = await response.json();
+      renderUpdateManifest(manifest);
+    } catch (err) {
+      if (updateStatusTitle) updateStatusTitle.textContent = 'Could not check for updates';
+      if (updateStatusDesc) updateStatusDesc.textContent = 'YCB could not read the GitHub update file. Check your connection and try again.';
+      if (updateSummary) updateSummary.textContent = 'The installed browser is still usable. Update checking only needs GitHub access.';
+      if (updateActionBtn) {
+        updateActionBtn.disabled = true;
+        updateActionBtn.textContent = 'Unavailable';
+      }
+    }
+  }
+
+  if (updateActionBtn) updateActionBtn.addEventListener('click', () => {
+    if (!latestUpdateManifest) return;
+    const url = latestUpdateManifest.installer_url || latestUpdateManifest.installerUrl || 'https://ycb.tomcreations.org/static/downloads/YCB-Setup.zip';
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify({ type: 'updates:openInstaller', url }));
+    } else {
+      location.href = url;
+    }
+  });
+  if (updateRecheckBtn) updateRecheckBtn.addEventListener('click', checkForUpdates);
+  setInstalledVersion(installedVersion);
+  checkForUpdates();
+
   // ── Theme toggle ──────────────────────────────────────────────────────────
   const themeSel = document.getElementById('theme-select');
   const themeDesc = document.getElementById('theme-desc');
@@ -1013,6 +1145,10 @@
           });
         });
       }
+    }
+    if (data.app_version !== undefined) {
+      setInstalledVersion(data.app_version || installedVersion);
+      checkForUpdates();
     }
     if (data.ai_enabled !== undefined) {
       if (aiEnabledToggle) aiEnabledToggle.classList.toggle('on', data.ai_enabled !== 'off');
