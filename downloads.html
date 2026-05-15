@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Downloads - YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#ffffff; --row:#ffffff; --text:#111111; --text2:#111111;
+      --muted:#3c4043; --border:rgba(0,0,0,0.10); --hover:#f1f3f4;
+      --accent:#1a73e8;
+    }
+    html.dark {
+      --bg:#202124; --row:rgba(255,255,255,0.04); --text:#f8f9fa; --text2:#f8f9fa;
+      --muted:#c9ccd1; --border:rgba(255,255,255,0.10); --hover:rgba(255,255,255,0.07);
+      --accent:#8ab4f8;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 13px; padding: 32px 48px;
+    }
+    h1 { font-size: 20px; font-weight: 400; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+    #clear-btn {
+      margin-left: auto; font-size: 12px; color: var(--accent);
+      background: rgba(138,180,248,0.1); border: none; border-radius: 6px;
+      padding: 6px 14px; cursor: pointer;
+    }
+    #clear-btn:hover { background: rgba(138,180,248,0.2); }
+    #dl-list { display: flex; flex-direction: column; gap: 6px; }
+    .dl-row {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--row); border-radius: 8px; padding: 10px 14px;
+      border: 1px solid var(--border);
+    }
+    .dl-row:hover { background: var(--hover); }
+    .dl-icon { flex-shrink: 0; color: var(--muted); }
+    .dl-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dl-size  { font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 70px; text-align: right; }
+    .dl-date  { font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 140px; text-align: right; }
+    .dl-status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+    .badge-ok   { background: rgba(52,168,83,0.15); color: #81c995; }
+    .badge-fail { background: rgba(234,67,53,0.15); color: #ea4335; }
+    .dl-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .dl-action-btn {
+      font-size: 11px; color: var(--accent); background: none; border: none;
+      padding: 3px 8px; border-radius: 4px; cursor: pointer;
+    }
+    .dl-action-btn:hover { background: rgba(138,180,248,0.12); }
+    #empty { text-align: center; color: var(--muted); margin-top: 80px; }
+    #empty svg { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12M7 11l5 5 5-5"/><path d="M5 19h14"/>
+    </svg>
+    Downloads
+    <button id="clear-btn">Clear all</button>
+  </h1>
+  <div id="dl-list"></div>
+  <div id="empty" style="display:none">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12M7 11l5 5 5-5"/><path d="M5 19h14"/>
+    </svg>
+    <p>No downloads yet</p>
+  </div>
+  <script>
+    function setTheme(theme) {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }
+    window.setTheme = setTheme;
+    setTheme(localStorage.getItem('browser_theme') || window.__ycbTheme || 'light');
+
+    // WebView2 bridge - messages go to C# via postMessage
+    const ycbAPI = {
+      postMessage: (type, data) => {
+        if (window.chrome && window.chrome.webview) {
+          window.chrome.webview.postMessage({ type, ...data });
+        }
+      },
+      getDownloadHistory: () => ycbAPI.postMessage('downloads:getHistory'),
+      clearDownloadHistory: () => ycbAPI.postMessage('downloads:clearHistory'),
+      openDownloadFile: (path) => ycbAPI.postMessage('downloads:openFile', { path }),
+      showInFolder: (path) => ycbAPI.postMessage('downloads:showInFolder', { path })
+    };
+
+    let downloadHistory = [];
+
+    function formatBytes(b) {
+      if (!b || b <= 0) return '';
+      if (b < 1024) return b + ' B';
+      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+      return (b/(1024*1024)).toFixed(1) + ' MB';
+    }
+    function formatDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    function fileIconSvg() {
+      return `<svg class="dl-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+        <polyline points="13 2 13 9 20 9"/>
+      </svg>`;
+    }
+    
+    // Called by C# to set download history
+    window.setDownloadHistory = function(history) {
+      downloadHistory = history || [];
+      renderHistory();
+    };
+    
+    function renderHistory() {
+      const list = document.getElementById('dl-list');
+      const empty = document.getElementById('empty');
+      if (!downloadHistory || downloadHistory.length === 0) { 
+        empty.style.display = 'block'; 
+        list.innerHTML = '';
+        return; 
+      }
+      empty.style.display = 'none';
+      list.innerHTML = '';
+      for (const item of downloadHistory) {
+        const row = document.createElement('div');
+        row.className = 'dl-row';
+        const ok = item.state === 'completed';
+        row.innerHTML = `
+          ${fileIconSvg()}
+          <span class="dl-name" title="${item.savePath}">${item.filename}</span>
+          <span class="dl-size">${formatBytes(item.totalBytes)}</span>
+          <span class="dl-date">${formatDate(item.completedAt)}</span>
+          <span class="dl-status-badge ${ok ? 'badge-ok' : 'badge-fail'}">${ok ? 'Done' : 'Failed'}</span>
+          <div class="dl-actions">
+            ${ok ? `<button class="dl-action-btn" data-action="open" data-path="${item.savePath}">Open</button>
+                    <button class="dl-action-btn" data-action="folder" data-path="${item.savePath}">Show in folder</button>` : ''}
+          </div>`;
+        list.appendChild(row);
+      }
+      list.querySelectorAll('.dl-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.action === 'open')   ycbAPI.openDownloadFile(btn.dataset.path);
+          if (btn.dataset.action === 'folder') ycbAPI.showInFolder(btn.dataset.path);
+        });
+      });
+    }
+    
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      ycbAPI.clearDownloadHistory();
+      downloadHistory = [];
+      renderHistory();
+    });
+    
+    // Request history on load
+    ycbAPI.getDownloadHistory();
+  </script>
+</body>
+</html>

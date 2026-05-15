@@ -1,0 +1,74 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <AssemblyName>YCB</AssemblyName>
+    <Product>YCB Browser</Product>
+    <Company>YCB</Company>
+    <Description>YCB Browser - A modern WebView2-based browser with profiles, extensions, ad blocking, and supported AI services</Description>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Resource Include="icon.ico" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="newtab.html">
+      <LogicalName>renderer/newtab.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="profiles.html">
+      <LogicalName>renderer/profiles.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="apps.html">
+      <LogicalName>renderer/apps.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="settings.html">
+      <LogicalName>renderer/settings.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="extensions.html">
+      <LogicalName>renderer/extensions.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="guide.html">
+      <LogicalName>renderer/guide.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="history.html">
+      <LogicalName>renderer/history.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="downloads.html">
+      <LogicalName>renderer/downloads.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="passwords.html">
+      <LogicalName>renderer/passwords.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="support.html">
+      <LogicalName>renderer/support.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="vpn.html">
+      <LogicalName>renderer/vpn.html</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="styles.css">
+      <LogicalName>renderer/styles.css</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="download_bar.js">
+      <LogicalName>renderer/download_bar.js</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ublock\**\*">
+      <LogicalName>ublock/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

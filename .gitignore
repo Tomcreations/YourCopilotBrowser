@@ -1,0 +1,34 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local build output
+publish/
+artifacts/
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+
+# Installer and generated binaries
+*.exe
+*.msi
+*.zip
+*.7z
+*.nupkg
+
+# Local browser data and logs
+*.log
+startup.log
+diagnostics.log
+profile-data/
+User Data/
+YCB-Browser/
+
+# OS clutter
+Thumbs.db
+Desktop.ini

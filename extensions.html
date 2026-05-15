@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:">
+  <title>Extensions - YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1e1f22; --card: #2d2e32; --card2: #33343a;
+      --text: #e8eaed; --text2: #9aa0a6; --accent: #8ab4f8;
+      --green: #81c995; --border: rgba(255,255,255,0.08);
+      --row-hover: rgba(255,255,255,0.04);
+    }
+    html.light {
+      --bg: #ffffff; --card: #ffffff; --card2: #f1f3f4;
+      --text: #202124; --text2: #5f6368; --accent: #1a73e8;
+      --green: #188038; --border: rgba(0,0,0,0.1); --row-hover: rgba(0,0,0,0.03);
+    }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 13px;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      height: 100vh;
+      padding: 32px 36px;
+      background: var(--bg);
+    }
+    .page-title { font-size: 22px; font-weight: 400; color: var(--text); margin-bottom: 6px; }
+    .page-sub { font-size: 12px; color: var(--text2); margin-bottom: 28px; line-height: 1.45; max-width: 780px; }
+    .section { margin-bottom: 24px; max-width: 940px; }
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text2); margin-bottom: 10px; padding-left: 2px;
+    }
+    .card {
+      background: var(--card); border-radius: 10px;
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 16px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-left { flex: 1; min-width: 0; }
+    .row-title { font-size: 13px; color: var(--text); }
+    .row-desc { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 12px;
+      background: rgba(138,180,248,0.1); border: 1px solid rgba(138,180,248,0.2);
+      color: var(--accent); font-size: 11px; margin-right: 6px; margin-top: 8px;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .btn:hover { background: var(--row-hover); }
+    .btn.primary {
+      border-color: rgba(138,180,248,0.35);
+      color: var(--accent);
+      background: rgba(138,180,248,0.08);
+    }
+    .btn.primary:hover { background: rgba(138,180,248,0.14); }
+    .btn.danger {
+      border-color: rgba(234,67,53,0.4);
+      color: #f28b82;
+      background: rgba(234,67,53,0.08);
+    }
+    .btn.danger:hover { background: rgba(234,67,53,0.14); }
+    .field {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      color: var(--text);
+      outline: none;
+      font-size: 13px;
+    }
+    .field:focus { border-color: var(--accent); }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 2px 0 4px;
+    }
+    .empty {
+      padding: 10px 2px 2px;
+      color: var(--text2);
+      line-height: 1.45;
+    }
+    .item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .item-main { flex: 1; min-width: 0; }
+    .item-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .item-id { word-break: break-all; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .hero {
+      background: linear-gradient(135deg, #1a2a4a 0%, #1e2a3a 100%);
+      border-radius: 10px;
+      padding: 18px 20px;
+      border: 1px solid rgba(138,180,248,0.15);
+      margin-bottom: 18px;
+    }
+    .hero-title {
+      font-size: 16px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #8ab4f8, #81c995);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .hero-sub { font-size: 12px; color: var(--text2); line-height: 1.45; }
+    .main::-webkit-scrollbar { width: 6px; }
+    .main::-webkit-scrollbar-track { background: transparent; }
+    .main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<main class="main">
+  <div class="header">
+    <div>
+      <div class="page-title">Extensions</div>
+      <div class="page-sub">Manage browser extensions for this profile. Install unpacked extensions from a local folder, open the Chrome Web Store, and enable or remove installed extensions.</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn primary" id="open-chrome-web-store">Chrome Web Store</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-title">Browser extensions</div>
+    <div class="hero-sub">WebView2 installs extensions from local folders. Paste an unpacked extension path below, then install it into the current profile.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Install unpacked</div>
+    <div class="card">
+      <div class="row">
+        <div class="row-left">
+          <div class="row-title">Local extension folder</div>
+          <div class="row-desc">Paste the folder that contains the extension manifest and files.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:340px">
+          <input class="field" id="extension-folder-input" placeholder="C:\\Path\\To\\Unpacked\\Extension" style="min-width:280px;flex:1">
+          <button class="btn primary" id="install-extension-btn">Install</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Installed</div>
+    <div class="card">
+      <div class="row">
+        <div class="row-left">
+          <div class="row-title">Installed extensions</div>
+          <div class="row-desc">Disable, enable, or remove browser extensions for this profile.</div>
+        </div>
+      </div>
+      <div id="extensions-list" class="list"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const extFolderInput = document.getElementById('extension-folder-input');
+  const installExtensionBtn = document.getElementById('install-extension-btn');
+  const openChromeWebStoreBtn = document.getElementById('open-chrome-web-store');
+  const extensionsList = document.getElementById('extensions-list');
+  const uiStateKey = 'ycb-extension-ui-state';
+
+  function loadUiState() {
+    try {
+      const raw = localStorage.getItem(uiStateKey);
+      if (!raw) return { disabled: {}, removed: {} };
+      const parsed = JSON.parse(raw);
+      return {
+        disabled: parsed && parsed.disabled ? parsed.disabled : {},
+        removed: parsed && parsed.removed ? parsed.removed : {}
+      };
+    } catch {
+      return { disabled: {}, removed: {} };
+    }
+  }
+
+  function saveUiState(state) {
+    try {
+      localStorage.setItem(uiStateKey, JSON.stringify(state));
+    } catch {}
+  }
+
+  function setUiState(extensionId, patch) {
+    if (!extensionId) return;
+    const state = loadUiState();
+    if (patch.removed) {
+      state.removed[extensionId] = true;
+      state.disabled[extensionId] = true;
+    } else if (patch.removed === false) {
+      delete state.removed[extensionId];
+    }
+    if (patch.disabled === true) {
+      state.disabled[extensionId] = true;
+    } else if (patch.disabled === false) {
+      delete state.disabled[extensionId];
+    }
+    saveUiState(state);
+  }
+
+  function postExtensionsMessage(payload) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify(payload));
+    }
+  }
+
+  function requestExtensions() {
+    postExtensionsMessage({ type: 'extensions:getAll' });
+  }
+
+  function renderExtensions(items) {
+    if (!extensionsList) return;
+    extensionsList.innerHTML = '';
+    const list = Array.isArray(items) ? items : [];
+    const state = loadUiState();
+
+    const visible = list.filter(ext => !state.removed[ext.id]);
+
+    if (visible.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'No browser extensions are installed for this profile.';
+      extensionsList.appendChild(empty);
+      return;
+    }
+
+    visible.forEach(ext => {
+      const enabled = state.disabled[ext.id] ? false : !!ext.enabled;
+      const row = document.createElement('div');
+      row.className = 'item';
+
+      const main = document.createElement('div');
+      main.className = 'item-main';
+
+      const title = document.createElement('div');
+      title.className = 'row-title';
+      title.textContent = ext.name || ext.id || 'Unknown extension';
+
+      const desc = document.createElement('div');
+      desc.className = 'row-desc item-id';
+      desc.textContent = ext.id ? `ID: ${ext.id}` : 'No extension ID available';
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
+
+      const stateChip = document.createElement('span');
+      stateChip.className = 'chip';
+      stateChip.textContent = enabled ? 'Enabled' : 'Disabled';
+      stateChip.style.background = enabled ? 'rgba(81, 167, 81, 0.16)' : 'rgba(95, 99, 104, 0.18)';
+      stateChip.style.color = enabled ? 'var(--green)' : 'var(--text2)';
+
+      meta.appendChild(stateChip);
+      main.appendChild(title);
+      main.appendChild(desc);
+      main.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'item-actions';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'btn';
+      toggle.textContent = enabled ? 'Disable' : 'Enable';
+      toggle.addEventListener('click', () => {
+        const nextEnabled = !enabled;
+        setUiState(ext.id, { disabled: !nextEnabled, removed: false });
+        renderExtensions(list);
+        postExtensionsMessage({ type: 'extensions:toggle', id: ext.id, enabled: nextEnabled });
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn danger';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => {
+        setUiState(ext.id, { removed: true, disabled: true });
+        renderExtensions(list);
+        postExtensionsMessage({ type: 'extensions:remove', id: ext.id });
+      });
+
+      actions.appendChild(toggle);
+      actions.appendChild(remove);
+      row.appendChild(main);
+      row.appendChild(actions);
+      extensionsList.appendChild(row);
+    });
+  }
+
+  window.setExtensions = renderExtensions;
+
+  if (installExtensionBtn) {
+    installExtensionBtn.addEventListener('click', () => {
+      const path = extFolderInput ? extFolderInput.value.trim() : '';
+      if (!path) {
+        return;
+      }
+      postExtensionsMessage({ type: 'extensions:installPath', path });
+    });
+  }
+
+  if (openChromeWebStoreBtn) {
+    openChromeWebStoreBtn.addEventListener('click', () => {
+      postExtensionsMessage({ type: 'extensions:openStore' });
+    });
+  }
+
+  requestExtensions();
+</script>
+</body>
+</html>

@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>New Tab</title>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --bg: #ffffff;
+      --bg2: #f1f3f4;
+      --bg3: #e8eaed;
+      --text: #111111;
+      --text2: #111111;
+      --text3: rgba(17,17,17,0.58);
+      --border: rgba(0,0,0,0.1);
+      --hover: rgba(0,0,0,0.06);
+      --blue: #1a73e8;
+      --blue-hover: #1557b0;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05);
+      --search-border: rgba(0,0,0,0.1);
+      --search-focus: #1a73e8;
+      --modal-bg: #f9f9f9;
+      --search-bg: #ffffff;
+    }
+    body.dark {
+      --bg: #202124;
+      --bg2: #303134;
+      --bg3: #3c4043;
+      --text: #f8f9fa;
+      --text2: #f8f9fa;
+      --text3: rgba(248,249,250,0.68);
+      --border: rgba(255,255,255,0.1);
+      --hover: rgba(255,255,255,0.08);
+      --blue: #8ab4f8;
+      --blue-hover: #aecbfa;
+      --shadow: 0 1px 6px rgba(0,0,0,0.4);
+      --search-border: rgba(255,255,255,0.12);
+      --search-focus: #8ab4f8;
+      --modal-bg: #2d2e32;
+      --search-bg: #303134;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* ── Top bar (Gmail / profile like Chrome) ── */
+    .ntp-topbar {
+      position: fixed;
+      top: 0; right: 0;
+      padding: 12px 18px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      z-index: 50;
+    }
+    .ntp-toplink {
+      font-size: 13px;
+      color: var(--text);
+      text-decoration: none;
+      padding: 8px 10px;
+      border-radius: 999px;
+      transition: background 0.15s, color 0.15s;
+      cursor: pointer;
+      background: none;
+      border: none;
+    }
+    .ntp-toplink:hover { background: var(--hover); color: var(--text); }
+    .ntp-profile-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      margin-left: 6px;
+      background: linear-gradient(135deg, #5b9bf9 0%, #4b7bec 100%);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .ntp-profile-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.16);
+    }
+    .ntp-profile-btn.guest {
+      background: linear-gradient(135deg, #f1f3f4, #dadce0);
+      color: #5f6368;
+    }
+
+    .profile-menu {
+      position: fixed;
+      top: 54px;
+      right: 18px;
+      width: 320px;
+      background: var(--modal-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 18px 36px rgba(0,0,0,0.18);
+      z-index: 120;
+      display: none;
+      overflow: hidden;
+    }
+    .profile-menu.open { display: block; }
+    .profile-menu-header {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .profile-menu-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .profile-menu-sub {
+      font-size: 12px;
+      color: var(--text3);
+      line-height: 1.4;
+    }
+    .profile-list {
+      max-height: 330px;
+      overflow: auto;
+      padding: 8px;
+    }
+    .profile-menu-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s;
+      font: inherit;
+    }
+    .profile-menu-item:hover { background: var(--hover); }
+    .profile-menu-item.active { background: rgba(26,115,232,0.10); }
+    .profile-menu-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+      overflow: hidden;
+    }
+    .profile-menu-text { min-width: 0; flex: 1; }
+    .profile-menu-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .profile-menu-desc {
+      font-size: 12px;
+      color: var(--text3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .profile-menu-footer {
+      display: flex;
+      gap: 8px;
+      padding: 12px 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .profile-menu-footer button {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .profile-menu-footer button:hover { background: var(--bg3); }
+
+    /* ── Main content ── */
+    .ntp-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 150px 24px 20px;
+      gap: 30px;
+      min-height: 0;
+    }
+
+    /* ── YCB Wordmark ── */
+    .ntp-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+    }
+    .ntp-logo-text {
+      font-size: 62px;
+      font-weight: 400;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      color: var(--text);
+      text-align: center;
+    }
+    .ntp-logo-text strong {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    /* ── Search bar (Chrome-style) ── */
+    .ntp-search-wrap {
+      width: 100%;
+      max-width: 754px;
+    }
+    .ntp-search {
+      display: flex;
+      align-items: center;
+      background: var(--search-bg);
+      border: 1px solid var(--search-border);
+      border-radius: 999px;
+      padding: 0 16px 0 18px;
+      height: 58px;
+      gap: 12px;
+      transition: box-shadow 0.2s, border-color 0.2s;
+      box-shadow: var(--shadow);
+    }
+    .ntp-search:hover {
+      box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+    }
+    body.dark .ntp-search:hover {
+      box-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    }
+    .ntp-search:focus-within {
+      box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+      border-color: transparent;
+    }
+    body.dark .ntp-search:focus-within {
+      box-shadow: 0 1px 8px rgba(138,180,248,0.2);
+    }
+    .ntp-search input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 400;
+      outline: none;
+    }
+    .ntp-search input::placeholder { color: var(--text3); }
+    .ntp-search-icons {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .ntp-search-icon-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text2);
+      transition: background 0.15s;
+    }
+    .ntp-search-icon-btn:hover { background: var(--hover); }
+
+    /* ── Shortcuts grid ── */
+    .ntp-shortcuts {
+      width: 100%;
+      max-width: 648px;
+    }
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(104px, 1fr));
+      gap: 0;
+      justify-items: center;
+    }
+    .shortcut-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 8px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+      color: var(--text);
+      position: relative;
+    }
+    .shortcut-tile:hover { background: var(--hover); }
+    .shortcut-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--bg2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+    .shortcut-icon img { width: 24px; height: 24px; }
+    .shortcut-label {
+      font-size: 12px;
+      color: var(--text);
+      text-align: center;
+      max-width: 80px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .shortcut-del {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: background 0.12s;
+    }
+    .shortcut-tile:hover .shortcut-del { display: flex; }
+    .shortcut-del:hover { background: #ea4335; color: #fff; border-color: transparent; }
+    .add-shortcut {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 8px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      color: var(--text2);
+    }
+    .add-shortcut:hover { background: var(--hover); }
+    .add-shortcut-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--bg2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: var(--text3);
+    }
+    .add-shortcut-label { font-size: 12px; }
+
+    /* ── Add shortcut modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--modal-bg);
+      border-radius: 14px;
+      padding: 28px 32px 24px;
+      width: 320px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      color: var(--text);
+    }
+    .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 18px; color: var(--text); }
+    .modal label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 5px; }
+    .modal input {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      margin-bottom: 14px;
+    }
+    .modal input:focus { border-color: var(--blue); }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-btns button {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    .modal-save { background: var(--blue); color: #fff; }
+    .modal-save:hover { filter: brightness(1.1); }
+    .modal-cancel { background: var(--hover); color: var(--text2); border: 1px solid var(--border); }
+    .modal-cancel:hover { background: var(--bg3); }
+
+    /* ── Customize button + panel ── */
+    .customize-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      transition: background 0.15s, box-shadow 0.15s;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    .customize-btn:hover { background: var(--bg3); color: var(--text); }
+    .customize-panel {
+      position: fixed;
+      bottom: 64px;
+      right: 20px;
+      background: var(--modal-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 22px;
+      width: 260px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      z-index: 100;
+      display: none;
+    }
+    .customize-panel.open { display: block; }
+    .cp-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+    .cp-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .cp-label { font-size: 13px; color: var(--text2); }
+    .cp-toggle {
+      width: 34px; height: 20px;
+      background: var(--text3); border-radius: 10px; border: none;
+      cursor: pointer; transition: background 0.2s; position: relative; flex-shrink: 0;
+    }
+    .cp-toggle.on { background: var(--blue); }
+    .cp-toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 16px; height: 16px; background: #fff; border-radius: 50%;
+      transition: left 0.2s;
+    }
+    .cp-toggle.on::after { left: 16px; }
+    .cp-section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text3);
+      margin-bottom: 10px; margin-top: 6px;
+    }
+    .bg-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .bg-swatch {
+      width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s;
+    }
+    .bg-swatch:hover { transform: scale(1.1); }
+    .bg-swatch.active { border-color: var(--blue); }
+    .bg-custom-row { display: flex; align-items: center; gap: 8px; }
+    .bg-custom-row label { font-size: 11px; color: var(--text2); }
+    input[type=color] {
+      width: 28px; height: 28px;
+      border: none; padding: 0;
+      border-radius: 6px; cursor: pointer; background: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top-right links -->
+  <div class="ntp-topbar">
+    <a class="ntp-toplink" id="email-link" href="https://mail.google.com" target="_self">Gmail</a>
+    <button class="ntp-profile-btn" id="profile-link" title="Switch profiles" aria-label="Switch profiles">Y</button>
+  </div>
+
+  <div class="profile-menu" id="profile-menu" aria-hidden="true">
+    <div class="profile-menu-header">
+      <div class="profile-menu-title">Switch profiles</div>
+      <div class="profile-menu-sub">Pick another profile or create a new one.</div>
+    </div>
+    <div class="profile-list" id="profile-menu-list"></div>
+  <div class="profile-menu-footer">
+      <button id="profile-menu-create">Create profile</button>
+    </div>
+  </div>
+
+  <div class="ntp-center">
+    <!-- Wordmark -->
+    <div class="ntp-logo">
+      <div class="ntp-logo-text">YCB <strong>Browser</strong></div>
+    </div>
+
+    <div class="ntp-search-wrap">
+      <div class="ntp-search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+          <circle cx="11" cy="11" r="7" stroke="var(--text3)" stroke-width="2"/>
+          <path d="M16.5 16.5L21 21" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search or type a URL" autofocus/>
+        <div class="ntp-search-icons" aria-hidden="true">
+          <button class="ntp-search-icon-btn" title="Search by voice">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M7 11.5a5 5 0 0 0 10 0" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M12 17v3" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="ntp-search-icon-btn" title="Search with Google Lens">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="5" width="5" height="5" rx="1" stroke="var(--text2)" stroke-width="1.8"/>
+              <rect x="14" y="5" width="5" height="5" rx="1" stroke="var(--text2)" stroke-width="1.8"/>
+              <rect x="5" y="14" width="5" height="5" rx="1" stroke="var(--text2)" stroke-width="1.8"/>
+              <rect x="14" y="14" width="5" height="5" rx="1" stroke="var(--text2)" stroke-width="1.8"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ntp-shortcuts" id="shortcuts-section">
+      <div class="shortcuts-grid" id="shortcuts-grid"></div>
+    </div>
+  </div>
+
+  <!-- Customize button (Chrome-style pill) -->
+  <button class="customize-btn" id="customize-btn" title="Customize this page">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+    Customise
+  </button>
+
+  <!-- Customize panel -->
+  <div class="customize-panel" id="customize-panel">
+    <div class="cp-title">Customise this page</div>
+    <div class="cp-row">
+      <span class="cp-label">Show shortcuts</span>
+      <button class="cp-toggle on" id="cp-toggle-shortcuts"></button>
+    </div>
+    <div class="cp-section-label">Background</div>
+    <div class="bg-presets" id="bg-presets"></div>
+    <div class="bg-custom-row">
+      <label for="bg-color-pick">Custom:</label>
+      <input type="color" id="bg-color-pick" value="#ffffff"/>
+    </div>
+  </div>
+
+  <!-- Add shortcut modal -->
+  <div class="modal-overlay" id="shortcut-modal">
+    <div class="modal">
+      <h3>Add shortcut</h3>
+      <label>Name</label>
+      <input type="text" id="sc-name" placeholder="e.g. GitHub"/>
+      <label>URL</label>
+      <input type="text" id="sc-url" placeholder="e.g. https://github.com"/>
+      <div class="modal-btns">
+        <button class="modal-cancel" id="sc-cancel">Cancel</button>
+        <button class="modal-save" id="sc-save">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="profile-modal">
+    <div class="modal">
+      <h3>Create profile</h3>
+      <label>Name</label>
+      <input type="text" id="profile-name" placeholder="Work, School, Family"/>
+      <label>Icon (optional)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="modal-cancel" id="profile-icon-browse" type="button">Choose icon</button>
+        <span id="profile-icon-label" style="font-size:12px;color:var(--text2)">No icon selected</span>
+      </div>
+      <div class="modal-btns">
+        <button class="modal-cancel" id="profile-cancel">Cancel</button>
+        <button class="modal-save" id="profile-save">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Theme ────────────────────────────────────────────────────────────────
+    const savedTheme = localStorage.getItem('browser_theme') || 'light';
+    if (savedTheme === 'dark') document.body.classList.add('dark');
+
+    // ── Email provider from settings ─────────────────────────────────────────
+    const EMAIL_PROVIDERS = {
+      gmail:     { label: 'Gmail',       url: 'https://mail.google.com' },
+      outlook:   { label: 'Outlook',     url: 'https://outlook.live.com' },
+      yahoo:     { label: 'Yahoo Mail',  url: 'https://mail.yahoo.com' },
+      proton:    { label: 'Proton Mail', url: 'https://mail.proton.me' },
+      icloud:    { label: 'iCloud Mail', url: 'https://www.icloud.com/mail' },
+    };
+    const emailProvider = localStorage.getItem('email_provider') || 'gmail';
+    const ep = EMAIL_PROVIDERS[emailProvider] || EMAIL_PROVIDERS.gmail;
+    const emailLink = document.getElementById('email-link');
+    emailLink.textContent = ep.label;
+    emailLink.href = ep.url;
+
+    // ── Engine from localStorage ─────────────────────────────────────────────
+    const ENGINE_META = {
+      google:     { url: 'https://www.google.com/search?q=' },
+      bing:       { url: 'https://www.bing.com/search?q=' },
+      duckduckgo: { url: 'https://duckduckgo.com/?q=' },
+      yahoo:      { url: 'https://search.yahoo.com/search?p=' },
+      ecosia:     { url: 'https://www.ecosia.org/search?q=' },
+      brave:      { url: 'https://search.brave.com/search?q=' },
+    };
+    const engineKey = localStorage.getItem('search_engine') || 'google';
+    const engineUrl = (ENGINE_META[engineKey] || ENGINE_META.google).url;
+
+    // ── Search ───────────────────────────────────────────────────────────────
+    function doSearch() {
+      const searchInput = document.getElementById('search-input');
+      const v = searchInput ? searchInput.value.trim() : '';
+      if (!v) return;
+      window.location.href = /^https?:\/\//i.test(v) ? v
+        : (!v.includes(' ') && v.includes('.')) ? 'https://' + v
+        : engineUrl + encodeURIComponent(v);
+    }
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+    function postHost(payload) {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(JSON.stringify(payload));
+      }
+    }
+    const profileBtn = document.getElementById('profile-link');
+    const profileMenu = document.getElementById('profile-menu');
+    const profileMenuList = document.getElementById('profile-menu-list');
+    const profileMenuCreate = document.getElementById('profile-menu-create');
+    const profileModal = document.getElementById('profile-modal');
+    const profileNameInput = document.getElementById('profile-name');
+    const profileIconBrowse = document.getElementById('profile-icon-browse');
+    const profileIconLabel = document.getElementById('profile-icon-label');
+    let profileState = { name: '', initial: 'Y', icon: '', color: '#5b9bf9', profiles: [] };
+    let pendingProfileIcon = '';
+
+    function guestIconSvg() {
+      return `<span style="font-size:18px;line-height:1;">👤</span>`;
+    }
+
+    function iconSrc(icon) {
+      const v = (icon || '').trim();
+      if (!v) return '';
+      if (/^file:\/\//i.test(v) || /^https?:\/\//i.test(v) || /^data:image\//i.test(v)) return v;
+      if (/^[a-zA-Z]:[\\/]/.test(v)) {
+        return 'file:///' + v.replace(/\\/g, '/').replace(/^([a-zA-Z]):/, (_, d) => d.toUpperCase() + ':');
+      }
+      return v;
+    }
+
+    function profileAvatarMarkup(profile) {
+      const icon = (profile?.icon || '').trim();
+      const initial = (profile?.initial || profile?.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+      if (!icon) return guestIconSvg();
+      if (looksLikeImage(icon)) {
+        return `<img src="${iconSrc(icon)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`;
+      }
+      return icon.length <= 2 ? icon : initial;
+    }
+
+    function looksLikeImage(value) {
+      const v = (value || '').trim();
+      return /^https?:\/\//i.test(v) || /^data:image\//i.test(v) || /^file:\/\//i.test(v) || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(v);
+    }
+
+    function setProfileButtonDisplay() {
+      if (!profileBtn) return;
+      const icon = (profileState.icon || '').trim();
+      const initial = (profileState.initial || profileState.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+      profileBtn.classList.toggle('guest', !icon);
+      profileBtn.style.background = icon ? (profileState.color || '#5b9bf9') : '';
+      profileBtn.style.color = icon ? '#fff' : '';
+      if (!icon) {
+        profileBtn.innerHTML = guestIconSvg();
+      } else if (looksLikeImage(icon)) {
+        profileBtn.innerHTML = `<img src="${iconSrc(icon)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      } else {
+        profileBtn.innerHTML = '';
+        profileBtn.textContent = icon.length <= 2 ? icon : initial;
+      }
+      profileBtn.title = profileState.name || 'Switch profiles';
+      profileBtn.setAttribute('aria-label', profileState.name || 'Switch profiles');
+    }
+
+    function closeProfileMenu() {
+      if (!profileMenu) return;
+      profileMenu.classList.remove('open');
+      profileMenu.setAttribute('aria-hidden', 'true');
+    }
+    function openProfileMenu() {
+      if (!profileMenu) return;
+      profileMenu.classList.add('open');
+      profileMenu.setAttribute('aria-hidden', 'false');
+    }
+    function toggleProfileMenu() {
+      if (!profileMenu) return;
+      if (profileMenu.classList.contains('open')) closeProfileMenu();
+      else openProfileMenu();
+    }
+    if (profileBtn) profileBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleProfileMenu();
+    });
+    document.addEventListener('click', e => {
+      if (profileMenu && !profileMenu.contains(e.target) && !profileBtn.contains(e.target)) closeProfileMenu();
+    });
+
+    function renderProfileMenu() {
+      if (!profileMenuList) return;
+      profileMenuList.innerHTML = '';
+      const current = {
+        name: profileState.name || 'Current profile',
+        initial: profileState.initial || 'Y',
+        icon: profileState.icon || '',
+        color: profileState.color || '#5b9bf9'
+      };
+      const seen = new Set();
+      const items = [current, ...(Array.isArray(profileState.profiles) ? profileState.profiles : [])]
+        .filter(profile => {
+          const key = (profile.name || '').toString().trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      items.forEach((profile, index) => {
+        const row = document.createElement('button');
+        row.className = 'profile-menu-item' + (index === 0 ? ' active' : '');
+        row.innerHTML = `
+          <div class="profile-menu-avatar" style="background:${profile.color || '#5b9bf9'}">${profileAvatarMarkup(profile)}</div>
+          <div class="profile-menu-text">
+            <div class="profile-menu-name">${profile.name || 'Profile'}</div>
+            <div class="profile-menu-desc">${index === 0 ? 'Current profile' : 'Switch to this profile'}</div>
+          </div>`;
+        row.addEventListener('click', () => {
+          if (index === 0) {
+            closeProfileMenu();
+            return;
+          }
+          postHost({ type: 'profiles:open', target: 'default', source: 'menu', name: profile.name, initial: profile.initial, color: profile.color, icon: profile.icon });
+          closeProfileMenu();
+        });
+        profileMenuList.appendChild(row);
+      });
+    }
+
+    if (profileMenuCreate) profileMenuCreate.addEventListener('click', () => {
+      closeProfileMenu();
+      profileModal.classList.add('open');
+      pendingProfileIcon = '';
+      profileIconLabel.textContent = 'No icon selected';
+      setTimeout(() => profileNameInput.focus(), 0);
+    });
+    const profileCancel = document.getElementById('profile-cancel');
+    const profileSave = document.getElementById('profile-save');
+    if (profileCancel && profileModal) profileCancel.addEventListener('click', () => profileModal.classList.remove('open'));
+    if (profileModal) profileModal.addEventListener('click', e => {
+      if (e.target === profileModal) profileModal.classList.remove('open');
+    });
+    if (profileSave) profileSave.addEventListener('click', () => {
+      const name = (profileNameInput.value || '').trim();
+      if (!name) return profileNameInput.focus();
+      const icon = (pendingProfileIcon || '').trim();
+      const initial = name.charAt(0).toUpperCase();
+      postHost({ type: 'profiles:create', source: 'menu', name, initial, icon, color: profileState.color || '#5b9bf9' });
+      profileModal.classList.remove('open');
+      profileNameInput.value = '';
+      pendingProfileIcon = '';
+      profileIconLabel.textContent = 'No icon selected';
+    });
+    if (profileNameInput) profileNameInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && profileSave) profileSave.click();
+      if (e.key === 'Escape') profileModal.classList.remove('open');
+    });
+    if (profileIconBrowse) profileIconBrowse.addEventListener('click', () => postHost({ type: 'profiles:pickIcon' }));
+
+    window.setPickedProfileIcon = function(path) {
+      pendingProfileIcon = (path || '').toString().trim();
+      profileIconLabel.textContent = pendingProfileIcon ? pendingProfileIcon.split(/[/\\]/).pop() : 'No icon selected';
+    };
+
+    window.setProfileInfo = function(info) {
+      if (!info) return;
+      profileState.name = (info.name || profileState.name || '').toString().trim();
+      profileState.initial = (info.initial || profileState.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+      profileState.icon = (info.icon || '').toString().trim();
+      profileState.color = info.color || profileState.color || '#5b9bf9';
+      setProfileButtonDisplay();
+      renderProfileMenu();
+    };
+
+    window.setProfilesState = function(state) {
+      if (!state) return;
+      if (state.name || state.initial || state.icon || state.color) {
+        profileState.name = (state.name || profileState.name || '').toString().trim();
+        profileState.initial = (state.initial || profileState.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+        profileState.icon = (state.icon || '').toString().trim();
+        profileState.color = state.color || profileState.color || '#5b9bf9';
+        setProfileButtonDisplay();
+      }
+      profileState.profiles = Array.isArray(state.profiles) ? state.profiles : [];
+      renderProfileMenu();
+    };
+
+    setProfileButtonDisplay();
+    renderProfileMenu();
+    postHost({ type: 'profiles:getState' });
+
+    // ── Shortcuts ────────────────────────────────────────────────────────────
+    const DEFAULT_SHORTCUTS = [
+      { name: 'YouTube',   url: 'https://www.youtube.com' },
+      { name: 'GitHub',    url: 'https://github.com' },
+      { name: 'Reddit',    url: 'https://www.reddit.com' },
+      { name: 'ChatGPT',   url: 'https://chat.openai.com' },
+    ];
+
+    function loadShortcuts() {
+      try { return JSON.parse(localStorage.getItem('ntp_shortcuts') || 'null') || DEFAULT_SHORTCUTS; }
+      catch { return DEFAULT_SHORTCUTS; }
+    }
+    function saveShortcuts(sc) { localStorage.setItem('ntp_shortcuts', JSON.stringify(sc)); }
+
+    function renderShortcuts() {
+      const grid = document.getElementById('shortcuts-grid');
+      grid.innerHTML = '';
+      const shortcuts = loadShortcuts();
+      shortcuts.forEach((sc, i) => {
+        const tile = document.createElement('div');
+        tile.className = 'shortcut-tile';
+        const host = (() => { try { return new URL(sc.url).hostname; } catch { return ''; } })();
+        const initial = sc.name.charAt(0).toUpperCase();
+        tile.innerHTML = `
+          <div class="shortcut-icon" id="sc-icon-${i}">
+            <img src="https://www.google.com/s2/favicons?domain=${host}&sz=48"
+                 onerror="this.parentElement.textContent='${initial}'"
+                 onload="this.parentElement.style.background='transparent'">
+          </div>
+          <span class="shortcut-label">${sc.name}</span>
+          <button class="shortcut-del" title="Remove" data-i="${i}">&times;</button>`;
+        tile.querySelector('.shortcut-icon').addEventListener('click', () => { window.location.href = sc.url; });
+        tile.querySelector('.shortcut-label').addEventListener('click', () => { window.location.href = sc.url; });
+        tile.querySelector('.shortcut-del').addEventListener('click', e => {
+          e.stopPropagation();
+          const sc2 = loadShortcuts(); sc2.splice(i, 1);
+          saveShortcuts(sc2); renderShortcuts();
+        });
+        grid.appendChild(tile);
+      });
+      const addTile = document.createElement('div');
+      addTile.className = 'add-shortcut';
+      addTile.innerHTML = '<div class="add-shortcut-icon">+</div><span class="add-shortcut-label">Add shortcut</span>';
+      addTile.addEventListener('click', () => {
+        document.getElementById('shortcut-modal').classList.add('open');
+        document.getElementById('sc-name').focus();
+      });
+      grid.appendChild(addTile);
+    }
+    renderShortcuts();
+
+    // Shortcut modal
+    document.getElementById('sc-cancel').addEventListener('click', () => {
+      document.getElementById('shortcut-modal').classList.remove('open');
+      document.getElementById('sc-name').value = '';
+      document.getElementById('sc-url').value = '';
+    });
+    document.getElementById('sc-save').addEventListener('click', () => {
+      let url = document.getElementById('sc-url').value.trim();
+      const name = document.getElementById('sc-name').value.trim();
+      if (!url) return document.getElementById('sc-url').focus();
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      const label = name || (() => { try { return new URL(url).hostname; } catch { return url; } })();
+      const sc = loadShortcuts(); sc.push({ name: label, url });
+      saveShortcuts(sc); renderShortcuts();
+      document.getElementById('shortcut-modal').classList.remove('open');
+      document.getElementById('sc-name').value = '';
+      document.getElementById('sc-url').value = '';
+    });
+    document.getElementById('sc-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('sc-url').focus();
+      if (e.key === 'Escape') document.getElementById('sc-cancel').click();
+    });
+    document.getElementById('sc-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('sc-save').click();
+      if (e.key === 'Escape') document.getElementById('sc-cancel').click();
+    });
+    document.getElementById('shortcut-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('shortcut-modal')) document.getElementById('sc-cancel').click();
+    });
+
+    // ── Customization ────────────────────────────────────────────────────────
+    const BG_PRESETS = [
+      { color: '#ffffff', label: 'White (default)' },
+      { color: '#f8f9fa', label: 'Soft white' },
+      { color: '#e8f0fe', label: 'Blue tint' },
+      { color: '#202124', label: 'Dark' },
+      { color: '#0d1117', label: 'Midnight' },
+      { color: '#1a1a2e', label: 'Indigo' },
+    ];
+
+    function loadPref(k, def) { return localStorage.getItem('ntp_' + k) ?? def; }
+    function savePref(k, v) { localStorage.setItem('ntp_' + k, v); }
+
+    function parseHexColor(color) {
+      const hex = (color || '').replace('#','').trim();
+      if (hex.length !== 6) return null;
+      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+      if ([r,g,b].some(Number.isNaN)) return null;
+      return { r, g, b, lum: (0.299*r + 0.587*g + 0.114*b) / 255 };
+    }
+
+    function resolveThemeColor(color, themeHint) {
+      const fallback = themeHint === 'dark' ? '#202124' : '#ffffff';
+      const parsed = parseHexColor(color);
+      if (!themeHint || !parsed) return color || fallback;
+      if (themeHint === 'dark' && parsed.lum >= 0.42) return fallback;
+      if (themeHint === 'light' && parsed.lum < 0.42) return fallback;
+      return color || fallback;
+    }
+
+    function applyBg(color, themeHint) {
+      // Detect if dark for body class (rough luminance check)
+      const resolvedColor = resolveThemeColor(color, themeHint);
+      const parsed = parseHexColor(resolvedColor);
+      if (themeHint === 'dark') {
+        document.body.classList.add('dark');
+      } else if (themeHint === 'light') {
+        document.body.classList.remove('dark');
+      } else if (parsed) {
+        if (parsed.lum < 0.4) document.body.classList.add('dark');
+        else document.body.classList.remove('dark');
+      }
+      document.body.style.background = resolvedColor;
+      document.getElementById('bg-color-pick').value = resolvedColor;
+      document.querySelectorAll('.bg-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === resolvedColor);
+      });
+    }
+
+    const presetsEl = document.getElementById('bg-presets');
+    BG_PRESETS.forEach(p => {
+      const s = document.createElement('div');
+      s.className = 'bg-swatch';
+      s.dataset.color = p.color;
+      s.style.background = p.color;
+      s.style.border = '2px solid var(--border)';
+      s.title = p.label;
+      s.addEventListener('click', () => { applyBg(p.color); savePref('bg', p.color); });
+      presetsEl.appendChild(s);
+    });
+
+    const savedBg = loadPref('bg', savedTheme === 'dark' ? '#202124' : '#ffffff');
+    applyBg(savedBg, savedTheme);
+
+    document.getElementById('bg-color-pick').addEventListener('input', e => {
+      applyBg(e.target.value);
+      savePref('bg', e.target.value);
+    });
+
+    // Toggle shortcuts
+    const shortcutsToggle = document.getElementById('cp-toggle-shortcuts');
+    const showShortcuts = loadPref('show_shortcuts', 'true') === 'true';
+    if (!showShortcuts) {
+      document.getElementById('shortcuts-section').style.display = 'none';
+      shortcutsToggle.classList.remove('on');
+    }
+    shortcutsToggle.addEventListener('click', () => {
+      const on = !shortcutsToggle.classList.contains('on');
+      shortcutsToggle.classList.toggle('on', on);
+      document.getElementById('shortcuts-section').style.display = on ? '' : 'none';
+      savePref('show_shortcuts', on ? 'true' : 'false');
+    });
+
+    // Customize panel toggle
+    const customizeBtn = document.getElementById('customize-btn');
+    const customizePanel = document.getElementById('customize-panel');
+    customizeBtn.addEventListener('click', () => customizePanel.classList.toggle('open'));
+    document.addEventListener('click', e => {
+      if (!customizePanel.contains(e.target) && e.target !== customizeBtn)
+        customizePanel.classList.remove('open');
+    });
+
+    // ── Listen for theme changes from parent ─────────────────────────────────
+    window.setTheme = function(theme) {
+      localStorage.setItem('browser_theme', theme);
+      const current = loadPref('bg', theme === 'dark' ? '#202124' : '#ffffff');
+      applyBg(current, theme);
+    };
+
+    // Signal ready for bookmark injection
+    console.log('__newtab__:ready');
+  </script>
+</body>

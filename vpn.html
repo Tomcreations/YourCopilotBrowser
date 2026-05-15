@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VPN</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #202124;
+    color: #e8eaed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 32px;
+    color: #e8eaed;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card {
+    background: #292a2d;
+    border-radius: 12px;
+    padding: 28px 32px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 20px;
+  }
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px 0;
+  }
+  .vpn-orb {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  .vpn-orb.off  { background: #3c3f43; box-shadow: 0 0 0 0 transparent; }
+  .vpn-orb.on   { background: #1a6b3a; box-shadow: 0 0 0 12px rgba(129,201,149,.15), 0 0 28px rgba(129,201,149,.3); }
+  .status-label {
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .status-label.off { color: #9aa0a6; }
+  .status-label.on  { color: #81c995; }
+  .location-badge {
+    font-size: 13px;
+    color: #9aa0a6;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .location-badge span.flag { font-size: 18px; }
+
+  .toggle-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 8px;
+  }
+  .toggle-btn:active { transform: scale(0.98); }
+  .toggle-btn.connect    { background: #1a73e8; color: #fff; }
+  .toggle-btn.connect:hover { background: #1966cc; }
+  .toggle-btn.disconnect { background: #c62828; color: #fff; }
+  .toggle-btn.disconnect:hover { background: #b71c1c; }
+  .toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #9aa0a6;
+    margin-bottom: 14px;
+  }
+  .location-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .loc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: #35363a;
+    transition: border-color .15s, background .15s;
+  }
+  .loc-item:hover { background: #3c3f43; }
+  .loc-item.selected { border-color: #1a73e8; background: #1a3a5c; }
+  .loc-item .flag { font-size: 22px; }
+  .loc-item .name { flex: 1; font-size: 14px; }
+  .loc-item .check { color: #1a73e8; font-size: 16px; display: none; }
+  .loc-item.selected .check { display: block; }
+
+  .custom-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .custom-input {
+    flex: 1;
+    background: #35363a;
+    border: 1px solid #5f6368;
+    border-radius: 6px;
+    color: #e8eaed;
+    padding: 9px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  .custom-input:focus { border-color: #1a73e8; }
+  .custom-save-btn {
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .custom-save-btn:hover { background: #1966cc; }
+
+  .note {
+    font-size: 12px;
+    color: #9aa0a6;
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<h1>🛡️ VPN</h1>
+
+<!-- Status card -->
+<div class="card">
+  <div class="status-indicator">
+    <div class="vpn-orb off" id="orb">🛡️</div>
+    <div class="status-label off" id="statusLabel">Disconnected</div>
+    <div class="location-badge" id="locationBadge" style="display:none">
+      <span class="flag" id="locFlag"></span>
+      <span id="locName"></span>
+    </div>
+  </div>
+  <button class="toggle-btn connect" id="toggleBtn" onclick="toggleVpn()">Connect</button>
+</div>
+
+<!-- Location selection -->
+<div class="card">
+  <div class="section-title">Select Location</div>
+  <div class="location-list" id="locationList">
+    <div class="loc-item selected" data-server="socks5://103.75.117.21:4153" data-location="India" onclick="selectLocation(this)">
+      <span class="flag">🇮🇳</span>
+      <span class="name">India <span style="color:#9aa0a6;font-size:12px">(Default)</span></span>
+      <span class="check">✓</span>
+    </div>
+    <div class="loc-item" data-server="socks5://103.22.200.0:4145" data-location="United States" onclick="selectLocation(this)">
+      <span class="flag">🇺🇸</span>
+      <span class="name">United States</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="loc-item" data-server="socks5://51.83.140.200:4153" data-location="United Kingdom" onclick="selectLocation(this)">
+      <span class="flag">🇬🇧</span>
+      <span class="name">United Kingdom</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="loc-item" data-server="socks5://185.179.232.251:4153" data-location="Germany" onclick="selectLocation(this)">
+      <span class="flag">🇩🇪</span>
+      <span class="name">Germany</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="loc-item" data-server="socks5://103.216.82.209:6667" data-location="Singapore" onclick="selectLocation(this)">
+      <span class="flag">🇸🇬</span>
+      <span class="name">Singapore</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="loc-item" data-server="socks5://103.249.28.195:4145" data-location="Japan" onclick="selectLocation(this)">
+      <span class="flag">🇯🇵</span>
+      <span class="name">Japan</span>
+      <span class="check">✓</span>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:16px">Custom Proxy Server</div>
+  <div class="custom-row">
+    <input class="custom-input" id="customServer" type="text"
+           placeholder="socks5://host:port or http://host:port"/>
+    <button class="custom-save-btn" onclick="saveCustom()">Use This</button>
+  </div>
+  <p class="note">⚠️ These are public SOCKS5 proxies and may change. For reliable use, set up your own proxy server and enter it above.</p>
+</div>
+
+<script>
+  var state = { enabled: false, server: 'socks5://103.75.117.21:4153', location: 'India' };
+
+  const FLAGS = {
+    'India': '🇮🇳', 'United States': '🇺🇸', 'United Kingdom': '🇬🇧',
+    'Germany': '🇩🇪', 'Singapore': '🇸🇬', 'Japan': '🇯🇵', 'Custom': '🌐'
+  };
+
+  window.onVpnState = function(s) {
+    state = s;
+    render();
+  };
+
+  function render() {
+    var orb   = document.getElementById('orb');
+    var label = document.getElementById('statusLabel');
+    var btn   = document.getElementById('toggleBtn');
+    var badge = document.getElementById('locationBadge');
+
+    if (state.enabled) {
+      orb.className = 'vpn-orb on';
+      label.className = 'status-label on';
+      label.textContent = 'Connected';
+      btn.className = 'toggle-btn disconnect';
+      btn.textContent = 'Disconnect';
+      badge.style.display = 'flex';
+      document.getElementById('locFlag').textContent = FLAGS[state.location] || '🌐';
+      document.getElementById('locName').textContent = state.location;
+    } else {
+      orb.className = 'vpn-orb off';
+      label.className = 'status-label off';
+      label.textContent = 'Disconnected';
+      btn.className = 'toggle-btn connect';
+      btn.textContent = 'Connect';
+      badge.style.display = 'none';
+    }
+
+    // Highlight selected location
+    document.querySelectorAll('.loc-item').forEach(function(el) {
+      el.classList.toggle('selected', el.dataset.server === state.server);
+    });
+    document.getElementById('customServer').value = isBuiltin(state.server) ? '' : state.server;
+  }
+
+  function isBuiltin(server) {
+    return !!document.querySelector('[data-server="' + server + '"]');
+  }
+
+  function selectLocation(el) {
+    document.querySelectorAll('.loc-item').forEach(function(e) { e.classList.remove('selected'); });
+    el.classList.add('selected');
+    state.server   = el.dataset.server;
+    state.location = el.dataset.location;
+    document.getElementById('customServer').value = '';
+    // If already connected, reconnect with new location
+    if (state.enabled) applyState();
+  }
+
+  function saveCustom() {
+    var val = document.getElementById('customServer').value.trim();
+    if (!val) return;
+    document.querySelectorAll('.loc-item').forEach(function(e) { e.classList.remove('selected'); });
+    state.server   = val;
+    state.location = 'Custom';
+    if (state.enabled) applyState();
+  }
+
+  function toggleVpn() {
+    state.enabled = !state.enabled;
+    applyState();
+  }
+
+  function applyState() {
+    var btn = document.getElementById('toggleBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + (state.enabled ? 'Connecting...' : 'Disconnecting...');
+    window.chrome.webview.postMessage(JSON.stringify({
+      type:     'vpn:setState',
+      enabled:  state.enabled,
+      server:   state.server,
+      location: state.location
+    }));
+    // Note: page will be reloaded by the browser restarting tabs, so no need to re-enable button
+  }
+
+  // Request current state on load
+  window.chrome.webview.postMessage(JSON.stringify({ type: 'vpn:getState' }));
+</script>
+</body>
+</html>

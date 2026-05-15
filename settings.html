@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:">
+  <title>Settings - YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root,
+    html.dark {
+      --bg: #1f2227; --sidebar: #171a1f; --card: #292d34;
+      --card2: #34363b; --text: #f8f9fa; --text2: #e8eaed;
+      --accent: #8ab4f8; --green: #81c995; --border: rgba(255,255,255,0.10);
+      --red: #f28b82; --row-hover: rgba(255,255,255,0.08); --accent-soft: rgba(138,180,248,0.14);
+      --rail-text: #f8f9fa; --muted: #c9ccd1;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+    }
+    html.light {
+      --bg: #f6f7fb; --sidebar: #eef1f7; --card: #ffffff;
+      --card2: #f1f3f4; --text: #111111; --text2: rgba(17,17,17,0.86);
+      --accent: #1a73e8; --green: #188038; --border: rgba(0,0,0,0.1);
+      --red: #d93025; --row-hover: rgba(0,0,0,0.05); --accent-soft: rgba(26,115,232,0.11);
+      --rail-text: #202124; --muted: #3c4043;
+      --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; }
+    body { display: flex; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 272px; background: var(--sidebar); display: flex; flex-direction: column;
+      height: 100vh; flex-shrink: 0; border-right: 1px solid var(--border);
+      padding-top: 0;
+    }
+    .sidebar-header {
+      height: 76px; padding: 0 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 16px;
+    }
+    .sidebar-title { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; color: var(--text); }
+    .sidebar-sub { display:block; font-size:12px; color:var(--muted); margin-top:2px; }
+    .sidebar-nav { padding: 18px 0; flex: 1; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 22px;
+      padding: 12px 18px; border-radius: 14px; cursor: pointer;
+      color: var(--rail-text); font-size: 14px; margin: 0 14px 6px;
+      transition: background 0.12s, color 0.12s; text-decoration: none;
+      font-weight: 500;
+    }
+    .nav-item:hover { background: var(--row-hover); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--text); }
+    .nav-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 16px; color:var(--muted); display:flex; align-items:center; }
+    .nav-item.active .nav-icon { color:var(--text); }
+    .nav-break { height:1px; background:var(--border); margin:16px 0; }
+
+    /* Main */
+    .main { flex: 1; overflow-y: auto; height: 100vh; padding: 0 42px 56px; background: var(--bg); }
+    .main::-webkit-scrollbar { width: 6px; }
+    .main::-webkit-scrollbar-track { background: transparent; }
+    .main::-webkit-scrollbar-thumb { background: rgba(60,64,67,0.25); border-radius: 4px; }
+
+    .chrome-topbar {
+      height: 78px; display:flex; align-items:center; justify-content:space-between;
+      max-width: 860px; margin:0 auto 4px;
+    }
+    .chrome-title { display:flex; align-items:center; gap:16px; font-size:22px; font-weight:500; color:var(--text); }
+    .hamburger, .search-btn {
+      width:36px; height:36px; border:0; background:transparent; border-radius:50%; color:var(--text);
+      display:grid; place-items:center; cursor:pointer;
+    }
+    .hamburger:hover, .search-btn:hover { background:var(--row-hover); }
+    .managed-note { display:none; }
+    .managed-note a { color:#1a73e8; text-decoration:underline; cursor:pointer; }
+    .settings-content { max-width: 740px; margin:0 auto; }
+
+    .page-title { font-size: 15px; font-weight: 400; color: var(--text); margin-bottom: 16px; }
+    .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+
+    .section { margin-bottom: 24px; }
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text2); margin-bottom: 10px; padding-left: 2px;
+    }
+    .card {
+      background: var(--card); border-radius: 16px;
+      border: 1px solid var(--border); overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 17px 22px; border-bottom: 1px solid var(--border); gap: 16px;
+      min-height: 48px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-left { flex: 1; min-width: 0; }
+    .row-title { font-size: 14px; color: var(--text); }
+    .row-desc { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+    .row-desc.success { color: var(--green); }
+    .row-desc.muted { color: var(--text2); opacity: 0.7; }
+
+    /* Toggle */
+    .toggle {
+      position: relative; width: 38px; height: 22px;
+      background: #5f6368; border-radius: 11px; border: none;
+      cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+    }
+    html.light .toggle { background: #dadce0; }
+    html.light .toggle:hover { background: #cfd3d8; }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; background: #fff; border-radius: 50%;
+      transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .toggle.on::after { left: 19px; }
+
+    /* Select */
+    .sel {
+      background: var(--card2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 7px 10px; font-size: 13px; cursor: pointer; outline: none;
+      min-width: 140px; transition: border-color 0.15s;
+    }
+    .sel:focus { border-color: var(--accent); }
+    .sel option { background: var(--card); color: var(--text); }
+    html.light .sel {
+      background: #f8f9fa;
+      color: #202124;
+      border-color: #dfe1e5;
+    }
+    html.light .sel option { background: #ffffff; color: #202124; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: none; transition: all 0.15s; flex-shrink: 0;
+    }
+    .btn-primary { background: var(--accent-soft); color: var(--accent); border:1px solid rgba(138,180,248,0.35); border-radius:18px; }
+    .btn-primary:hover { background: #f8fbff; }
+    .btn-primary:disabled { background: #5f6368; color: #888; cursor: not-allowed; }
+    .btn-outline { background: transparent; color: var(--accent); border: 1px solid rgba(138,180,248,0.35); }
+    .btn-outline:hover { background: rgba(138,180,248,0.1); }
+    html.light .btn-outline:hover { background: rgba(26,115,232,0.08); }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #3c3d42; color: var(--text); padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; opacity: 0; transition: opacity 0.3s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: none; z-index: 100;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #toast.show { opacity: 1; }
+
+    /* YCB model hero */
+    .ycb-hero {
+      background: linear-gradient(135deg, #1a2a4a 0%, #1e2a3a 100%);
+      border-radius: 10px; padding: 18px 20px; margin-bottom: 10px;
+      border: 1px solid rgba(138,180,248,0.15);
+    }
+    .ycb-title {
+      font-size: 16px; font-weight: 600;
+      background: linear-gradient(90deg, #8ab4f8, #81c995);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .ycb-sub { font-size: 12px; color: var(--text2); margin-bottom: 14px; }
+    .ycb-select-row { display: flex; align-items: center; gap: 12px; }
+    .ycb-model-label { font-size: 12px; color: var(--text2); }
+
+    /* About card */
+    .about-version { font-size: 28px; font-weight: 300; margin-bottom: 4px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 12px;
+      background: rgba(138,180,248,0.1); border: 1px solid rgba(138,180,248,0.2);
+      color: var(--accent); font-size: 11px; margin-right: 6px; margin-top: 8px;
+    }
+    .profile-card-top {
+      display:flex; align-items:center; gap:16px; padding:14px 20px;
+      border-bottom:1px solid var(--border);
+    }
+    .profile-avatar {
+      width:40px; height:40px; border-radius:50%; display:grid; place-items:center;
+      background:#ab47bc; color:#fff; font-size:24px; font-weight:500; position:relative; flex-shrink:0;
+    }
+    .profile-avatar::after {
+      content:''; position:absolute; width:13px; height:13px; right:-2px; bottom:2px;
+      background:#34a853; border:2px solid #fff; border-radius:50%;
+    }
+    .profile-name { font-size:14px; color:var(--text); margin-bottom:3px; }
+    .profile-sync { font-size:13px; color:var(--muted); }
+    .profile-spacer { flex:1; }
+    .chev { color:var(--muted); font-size:24px; line-height:1; }
+    .external-mark { font-size:18px; color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div>
+      <div class="sidebar-title">YCB Settings</div>
+      <div class="sidebar-sub">Browser controls</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-section="profile"><span class="nav-icon">◎</span>Profile</a>
+    <a class="nav-item" data-section="privacy"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 9.3 8 10.9C16.5 21.3 20 17 20 12V6L12 2z"/></svg></span>Privacy and security</a>
+    <a class="nav-item" data-section="appearance"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v10l4.5 4.5"/></svg></span>Appearance</a>
+    <a class="nav-item" data-section="search"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>Search engine</a>
+    <a class="nav-item" data-section="default"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></span>Default browser</a>
+    <a class="nav-item" data-section="startup"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>On startup</a>
+    <div class="nav-break"></div>
+    <a class="nav-item" data-section="ycb"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="6"/><path d="M8 16c-2.5 1-4 2.5-4 4h16c0-1.5-1.5-3-4-4"/></svg></span>Browser service</a>
+    <a class="nav-item" data-section="extensions"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5z"/></svg></span>Extensions</a>
+    <a class="nav-item" data-section="beta"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14l3 3 3-3"/></svg></span>Optional features</a>
+    <a class="nav-item" data-section="about"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>About</a>
+  </nav>
+</aside>
+
+<main class="main">
+  <div class="chrome-topbar">
+    <div class="chrome-title">
+      <button class="hamburger" type="button" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <span>Settings</span>
+    </div>
+    <button class="search-btn" type="button" aria-label="Search settings">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4.5 4.5"/></svg>
+    </button>
+  </div>
+  <div class="managed-note">
+    <span>▦</span>
+    <span>YCB profile settings</span>
+  </div>
+  <div class="settings-content">
+
+  <div id="section-profile">
+    <div class="page-title">Profile</div>
+    <div class="card">
+      <div class="profile-card-top">
+        <div class="profile-avatar" id="profile-avatar">Y</div>
+        <div>
+          <div class="profile-name" id="profile-name">YCB Profile</div>
+          <div class="profile-sync" id="profile-subtitle">Local profile in YCB Browser</div>
+        </div>
+        <div class="profile-spacer"></div>
+        <button class="btn btn-primary" type="button" id="profile-turnoff">Turn off</button>
+      </div>
+      <div class="row"><div class="row-left"><div class="row-title">Profile storage</div><div class="row-desc">Cookies, history, extensions, and settings stay separate for this profile.</div></div><span class="chev">›</span></div>
+      <div class="row"><div class="row-left"><div class="row-title">Manage your YCB profile</div></div><span class="external-mark">↗</span></div>
+      <div class="row"><div class="row-left"><div class="row-title">Customise your browser profile</div></div><span class="chev">›</span></div>
+      <div class="row"><div class="row-left"><div class="row-title">Import bookmarks and settings</div></div><span class="chev">›</span></div>
+    </div>
+  </div>
+
+  <!-- Appearance -->
+  <div id="section-appearance" style="display:none">
+    <div class="page-title">Appearance</div>
+    <div class="page-sub">Customize how YCB Browser looks</div>
+    <div class="section">
+      <div class="section-label">Theme</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Color theme</div>
+            <div class="row-desc" id="theme-desc">Currently using dark mode</div>
+          </div>
+          <select class="sel" id="theme-select">
+            <option value="dark">Dark (default)</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Show bookmarks bar</div>
+            <div class="row-desc">Display your bookmarks below the toolbar</div>
+          </div>
+          <button class="toggle" id="toggle-bookmarks"></button>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">Font size</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Page font size</div>
+            <div class="row-desc">Controls the default size of text on web pages</div>
+          </div>
+          <select class="sel" id="font-size-select">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium (recommended)</option>
+            <option value="large">Large</option>
+            <option value="very-large">Very Large</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">Services</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Email provider</div>
+            <div class="row-desc">Shown as a quick link on the new tab page</div>
+          </div>
+          <select class="sel" id="email-provider-select">
+            <option value="gmail">Gmail</option>
+            <option value="outlook">Outlook</option>
+            <option value="yahoo">Yahoo Mail</option>
+            <option value="proton">Proton Mail</option>
+            <option value="icloud">iCloud Mail</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="section-search" style="display:none">
+    <div class="page-title">Search engine</div>
+    <div class="page-sub">Choose your default search engine for the address bar</div>
+    <div class="section">
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Address bar search engine</div>
+            <div class="row-desc">Used when you type a query in the address bar</div>
+          </div>
+          <select class="sel" id="search-engine-select">
+            <option value="google">Google</option>
+            <option value="bing">Bing</option>
+            <option value="duckduckgo">DuckDuckGo</option>
+            <option value="ecosia">Ecosia</option>
+            <option value="brave">Brave Search</option>
+            <option value="yahoo">Yahoo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Default browser -->
+  <div id="section-default" style="display:none">
+    <div class="page-title">Default browser</div>
+    <div class="page-sub">Set YCB Browser as your default browser</div>
+    <div class="section">
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Make YCB Browser your default</div>
+            <div class="row-desc" id="default-status">Checking status...</div>
+          </div>
+          <button class="btn btn-primary" id="btn-set-default">Set as default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- On startup -->
+  <div id="section-startup" style="display:none">
+    <div class="page-title">On startup</div>
+    <div class="page-sub">Choose what happens when you open YCB Browser</div>
+    <div class="section">
+      <div class="card">
+        <label class="row" style="cursor:pointer">
+          <div class="row-left">
+            <div class="row-title">Open the New Tab page</div>
+            <div class="row-desc">Start fresh every time</div>
+          </div>
+          <input type="radio" name="startup" value="newtab" id="startup-newtab" style="accent-color:#8ab4f8;width:16px;height:16px">
+        </label>
+        <label class="row" style="cursor:pointer">
+          <div class="row-left">
+            <div class="row-title">Continue where you left off</div>
+            <div class="row-desc">Reopen tabs from your last session</div>
+          </div>
+          <input type="radio" name="startup" value="continue" id="startup-continue" style="accent-color:#8ab4f8;width:16px;height:16px">
+        </label>
+        <label class="row" style="cursor:pointer">
+          <div class="row-left">
+            <div class="row-title">Ask me on startup</div>
+            <div class="row-desc">Show a prompt each time asking whether to restore your tabs</div>
+          </div>
+          <input type="radio" name="startup" value="ask" id="startup-ask" style="accent-color:#8ab4f8;width:16px;height:16px">
+        </label>
+        <label class="row" style="cursor:pointer">
+          <div class="row-left">
+            <div class="row-title">Show the profile chooser</div>
+            <div class="row-desc">Pick a profile before YCB opens your tabs</div>
+          </div>
+          <input type="radio" name="startup" value="profiles" id="startup-profiles" style="accent-color:#8ab4f8;width:16px;height:16px">
+        </label>
+      </div>
+    </div>
+    <div class="section" id="home-page-section">
+      <div class="section-label">Home page</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Home page URL</div>
+            <div class="row-desc">Opened when you click the Home button or on startup</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="home-page-input" class="sel" style="min-width:220px"
+                   placeholder="ycb://newtab or https://example.com" value="ycb://newtab"/>
+            <button class="btn btn-primary" id="home-page-save">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browser service -->
+  <div id="section-ycb" style="display:none">
+    <div class="page-title">Browser service</div>
+    <div class="page-sub">Choose which website opens in the YCB sidebar</div>
+    <div class="section">
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Enable browser service</div>
+            <div class="row-desc">Shows the sidebar button for this YCB profile only. Other profiles keep their own setting.</div>
+          </div>
+          <button class="toggle" id="toggle-ai-enabled"></button>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Default provider</div>
+            <div class="row-desc">YCB opens this website in the browser sidebar. No CLI, no terminal, just the site.</div>
+          </div>
+          <select class="sel" id="ai-provider-select">
+            <option value="chatgpt">ChatGPT</option>
+            <option value="gemini">Gemini</option>
+            <option value="claude">Claude</option>
+            <option value="microsoft-copilot">Microsoft Copilot</option>
+            <option value="grok">Grok</option>
+            <option value="meta-ai">Meta</option>
+            <option value="github-copilot">GitHub Copilot</option>
+            <option value="perplexity">Perplexity</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Sidebar mode</div>
+            <div class="row-desc">The page renders directly inside YCB's sidebar, like a plugin panel.</div>
+          </div>
+          <span class="chip">Web view</span>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Allow service in Incognito</div>
+            <div class="row-desc">The browser service is disabled in Incognito by default to protect your privacy</div>
+          </div>
+          <button class="toggle" id="toggle-incognito-ai"></button>
+        </div>
+        <div id="incognito-ai-warning" style="display:none;margin:0 0 4px;padding:10px 14px;background:rgba(251,188,4,0.1);border-radius:8px;border:1px solid rgba(251,188,4,0.3);font-size:12px;color:#fbc004;line-height:1.5">
+            <strong>Privacy warning:</strong> When this service is enabled in Incognito, it can see which websites you are visiting. Incognito mode will <strong>not</strong> protect you from it.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extensions -->
+  <div id="section-extensions" style="display:none">
+    <div class="page-title">Extensions</div>
+    <div class="page-sub">Manage browser extensions for the current profile. Open the full extensions manager for install, disable, and remove actions.</div>
+    <div class="section">
+      <div class="card">
+        <div class="row" style="align-items:flex-start;gap:12px">
+          <div class="row-left" style="flex:1">
+            <div class="row-title">Extensions manager</div>
+            <div class="row-desc">Open the dedicated extensions page to manage installed extensions and install unpacked ones.</div>
+          </div>
+          <button class="toggle" id="open-chrome-web-store" style="min-width:140px">Open manager</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optional Features -->
+  <div id="section-beta" style="display:none">
+    <div class="page-title">Optional features</div>
+    <div class="page-sub">Turn browser features on or off</div>
+    <div class="section">
+      <div class="section-label">Content Blocking</div>
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="row-title">uBlock Origin</div>
+            <div class="row-desc">Enable or disable the built-in uBlock Origin extension for all pages.</div>
+          </div>
+          <button class="toggle" id="toggle-ad-blocker"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div id="section-about" style="display:none">
+    <div class="page-title">About YCB Browser</div>
+    <div class="page-sub">Version information and credits</div>
+    <div class="section">
+      <div class="card">
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:10px;border:none;padding:22px 20px">
+          <div style="font-size:32px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></div>
+          <div class="about-version">YCB Browser</div>
+          <div style="font-size:13px;color:var(--text2)">Version 1.0.0 - Built on WebView2</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6">
+            Powered by <strong style="color:var(--text)">web services</strong><br>
+            Provider: <code style="color:var(--accent);background:rgba(138,180,248,0.1);padding:2px 8px;border-radius:4px" id="about-provider">ChatGPT</code>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">
+            User ID: <code id="about-user-id" style="color:var(--text);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px;font-size:11px;letter-spacing:0.3px;cursor:pointer;user-select:all" title="Click to copy">—</code>
+          </div>
+          <div>
+            <span class="chip">YCB</span>
+            <span class="chip">Service Enabled</span>
+            <span class="chip">WebView2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data & Privacy -->
+  <div id="section-privacy" style="display:none">
+    <div class="page-title">Data &amp; Privacy</div>
+    <div class="page-sub">Control what diagnostic information YCB Browser sends</div>
+
+    <div class="section">
+      <div class="section-label">Diagnostic Logging</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Send diagnostic data</div>
+            <div class="row-desc" id="telemetry-desc">Helps us detect crashes and improve stability</div>
+          </div>
+          <button class="toggle" id="toggle-telemetry"></button>
+        </div>
+        <div class="row" style="flex-direction:column;align-items:flex-start;gap:0;padding:16px 18px">
+          <div style="font-size:12px;color:var(--text2);line-height:1.7">
+            <strong style="color:var(--text);font-size:13px">What we log</strong><br>
+            All data is anonymous, non-personal and used <em>only</em> for debugging:
+            <ul style="margin:8px 0 0 16px;display:flex;flex-direction:column;gap:4px">
+              <li>App launch &amp; WebView2 version — to detect startup failures</li>
+              <li>Navigation errors (domain only, never full URLs) — to find broken sites</li>
+              <li>Tab open/close counts — to detect memory leaks</li>
+              <li>Download outcomes (file type &amp; size, no filenames) — to catch download bugs</li>
+              <li>Password prompt shown/saved (domain only, never credentials) — to debug autofill</li>
+              <li>UI freeze &amp; crash reports — to fix hangs</li>
+            </ul>
+          </div>
+        </div>
+        <div id="telemetry-appreciate" class="row" style="border-top:1px solid var(--border);padding:14px 18px;gap:10px;align-items:flex-start">
+          <span style="font-size:18px;flex-shrink:0">💙</span>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            <strong style="color:var(--text)">We'd appreciate you keeping this on.</strong><br>
+            Diagnostic data is the only way we can find and fix issues — we do <em>not</em> log your browsing history, passwords, URLs you visit, personal files, or any identifying information. This data is <strong style="color:var(--green)">never used for advertising, tracking, or any malicious purpose</strong>.
+          </div>
+        </div>
+        <div id="telemetry-off-notice" class="row" style="display:none;border-top:1px solid var(--border);padding:14px 18px;gap:10px;align-items:flex-start">
+          <span style="font-size:16px;flex-shrink:0">🔕</span>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            Diagnostic logging is <strong style="color:var(--red)">off</strong>. We won't receive any data from your browser. You can turn it back on at any time.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Your data stays yours</div>
+      <div class="card">
+        <div class="row"><div class="row-left"><div class="row-title">Browsing history</div><div class="row-desc">Stored locally on your device only. Never sent anywhere.</div></div><span style="color:var(--green);font-size:12px;font-weight:600">Local only</span></div>
+        <div class="row"><div class="row-left"><div class="row-title">Bitwarden integration</div><div class="row-desc">Use Bitwarden's browser extension and web vault for passwords, cards, identities, and passkeys.</div></div><span style="color:var(--green);font-size:12px;font-weight:600">External</span></div>
+        <div class="row"><div class="row-left"><div class="row-title">Cookie import</div><div class="row-desc">Copy signed-in cookies from Chrome, Edge, Brave, or Firefox into the YCB profile you are currently using.</div></div><span style="color:var(--green);font-size:12px;font-weight:600">Profile aware</span></div>
+        <div class="row"><div class="row-left"><div class="row-title">Bookmarks &amp; settings</div><div class="row-desc">Stored in your AppData folder. Never synced or uploaded.</div></div><span style="color:var(--green);font-size:12px;font-weight:600">Local only</span></div>
+        <div class="row"><div class="row-left"><div class="row-title">Full page URLs</div><div class="row-desc">Never sent in any log. Only the domain (e.g. "github.com") may appear in error reports.</div></div><span style="color:var(--green);font-size:12px;font-weight:600">Never logged</span></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-label">Cookie import</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Import cookies into this YCB profile</div>
+            <div class="row-desc">Choose a browser profile below. YCB imports the cookies into the profile you are currently using.</div>
+          </div>
+          <button class="btn btn-outline" id="cookie-import-refresh">Refresh</button>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Browser</div>
+            <div class="row-desc">Chrome, Edge, Brave, or Firefox</div>
+          </div>
+          <select class="sel" id="cookie-import-browser" style="min-width:180px">
+            <option value="chrome">Chrome</option>
+            <option value="edge">Edge</option>
+            <option value="brave">Brave</option>
+            <option value="firefox">Firefox</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Source profile</div>
+            <div class="row-desc">Pick a specific browser profile, such as Default or Profile 1</div>
+          </div>
+          <select class="sel" id="cookie-import-profile" style="min-width:220px"></select>
+        </div>
+        <div class="row">
+          <div class="row-left">
+            <div class="row-title">Import</div>
+            <div class="row-desc" id="cookie-import-status">No import started yet.</div>
+          </div>
+          <button class="btn btn-primary" id="cookie-import-run">Import cookies</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</main>
+
+<div id="toast">✓ Saved</div>
+
+<script>
+  // ── Apply light/dark theme on load ───────────────────────────────────────
+  const currentThemeOnLoad = load('browser_theme', 'dark');
+  function applySettingsTheme(theme) {
+    const mode = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(mode);
+    window.__ycbTheme = mode;
+  }
+  window.setTheme = applySettingsTheme;
+  applySettingsTheme(currentThemeOnLoad);
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  const sections = ['profile','appearance','search','default','startup','ycb','privacy','extensions','beta','about'];
+  const navItems = document.querySelectorAll('.nav-item');
+
+  function showSection(name) {
+    if (!sections.includes(name)) name = 'appearance';
+    sections.forEach(s => {
+      const section = document.getElementById('section-' + s);
+      if (section) section.style.display = s === name ? '' : 'none';
+    });
+    navItems.forEach(n => n.classList.toggle('active', n.dataset.section === name));
+    localStorage.setItem('settings_section', name);
+    if (location.hash !== '#' + name) {
+      history.replaceState(null, '', '#' + name);
+    }
+  }
+
+  window.showSettingsSection = showSection;
+
+  navItems.forEach(n => {
+    n.addEventListener('click', e => { e.preventDefault(); showSection(n.dataset.section); });
+  });
+
+  const hashSection = (location.hash || '').replace('#', '');
+  const savedSection = sections.includes(hashSection)
+    ? hashSection
+    : 'profile';
+  showSection(savedSection);
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  function showToast(msg) {
+    toast.textContent = '✓ ' + (msg || 'Saved');
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+
+  // ── Load all settings from localStorage ──────────────────────────────────
+  function load(key, fallback) {
+    const v = localStorage.getItem(key);
+    return v !== null ? v : fallback;
+  }
+  function save(key, val) {
+    localStorage.setItem(key, val);
+    // Notify the parent renderer so it can apply the setting immediately
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify({ type: 'settings:set', key, value: val }));
+    }
+  }
+
+  // Bookmarks toggle
+  const bookmarksToggle = document.getElementById('toggle-bookmarks');
+  if (bookmarksToggle && load('bookmarks_bar', 'off') === 'on') bookmarksToggle.classList.add('on');
+  if (bookmarksToggle) bookmarksToggle.addEventListener('click', () => {
+    bookmarksToggle.classList.toggle('on');
+    save('bookmarks_bar', bookmarksToggle.classList.contains('on') ? 'on' : 'off');
+    showToast('Bookmarks bar ' + (bookmarksToggle.classList.contains('on') ? 'shown' : 'hidden'));
+  });
+
+  // Font size
+  const fontSel = document.getElementById('font-size-select');
+  if (fontSel) fontSel.value = load('font_size', 'medium');
+  if (fontSel) fontSel.addEventListener('change', () => { save('font_size', fontSel.value); showToast('Font size set to ' + fontSel.value); });
+
+  // Search engine
+  const searchSel = document.getElementById('search-engine-select');
+  if (searchSel) searchSel.value = load('search_engine', 'google');
+  if (searchSel) searchSel.addEventListener('change', () => { save('search_engine', searchSel.value); showToast('Search engine: ' + searchSel.value); });
+
+  // Startup
+  const savedStartup = load('startup_mode', 'newtab');
+  const startupRadio = document.getElementById('startup-' + savedStartup) || document.getElementById('startup-newtab');
+  if (startupRadio) startupRadio.checked = true;
+  document.querySelectorAll('input[name="startup"]').forEach(r => {
+    r.addEventListener('change', () => { save('startup_mode', r.value); showToast('Startup: ' + r.value); });
+  });
+
+  // Home page
+  const homeInput = document.getElementById('home-page-input');
+  const homePageSave = document.getElementById('home-page-save');
+  if (homeInput) homeInput.value = load('home_page', 'ycb://newtab');
+  if (homePageSave) homePageSave.addEventListener('click', () => {
+    let v = homeInput ? homeInput.value.trim() : '';
+    if (!v) v = 'ycb://newtab';
+    if (v !== 'ycb://newtab' && !/^https?:\/\//i.test(v)) v = 'https://' + v;
+    save('home_page', v);
+    if (homeInput) homeInput.value = v;
+    showToast('Home page saved');
+  });
+  if (homeInput) homeInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && homePageSave) homePageSave.click();
+  });
+
+  // ── Browser service provider ──────────────────────────────────────────────
+  const providerSel = document.getElementById('ai-provider-select');
+  const aiEnabledToggle = document.getElementById('toggle-ai-enabled');
+  const providerLabels = {
+    chatgpt: 'ChatGPT',
+    gemini: 'Gemini',
+    claude: 'Claude',
+    'microsoft-copilot': 'Microsoft Copilot',
+    grok: 'Grok',
+    'meta-ai': 'Meta',
+    'github-copilot': 'GitHub Copilot',
+    perplexity: 'Perplexity',
+    deepseek: 'DeepSeek'
+  };
+
+  const normalizeProvider = (value) => {
+    const v = (value || '').toString().trim().toLowerCase();
+    if (v === 'github' || v === 'copilot' || v === 'codex') return 'github-copilot';
+    if (v === 'microsoft') return 'microsoft-copilot';
+    if (v === 'chat gpt') return 'chatgpt';
+    return providerLabels[v] ? v : 'chatgpt';
+  };
+
+  const rawProvider = normalizeProvider(load('ai_provider', 'chatgpt'));
+  if (aiEnabledToggle) {
+    aiEnabledToggle.classList.toggle('on', load('ai_enabled', 'on') !== 'off');
+    aiEnabledToggle.addEventListener('click', () => {
+      const on = !aiEnabledToggle.classList.contains('on');
+      aiEnabledToggle.classList.toggle('on', on);
+      save('ai_enabled', on ? 'on' : 'off');
+      showToast(on ? 'Browser service enabled for this profile' : 'Browser service disabled for this profile');
+    });
+  }
+  const profileTurnOff = document.getElementById('profile-turnoff');
+  if (profileTurnOff) profileTurnOff.addEventListener('click', () => {
+    save('ai_enabled', 'off');
+    if (aiEnabledToggle) aiEnabledToggle.classList.remove('on');
+    showToast('Browser service disabled for this profile');
+  });
+  if (providerSel) {
+    providerSel.value = rawProvider;
+    providerSel.addEventListener('change', () => {
+      const selected = normalizeProvider(providerSel.value);
+      providerSel.value = selected;
+      save('ai_provider', selected);
+      const about = document.getElementById('about-provider');
+      if (about) about.textContent = providerLabels[selected] || selected;
+      showToast('Provider: ' + (providerLabels[selected] || selected));
+    });
+  }
+  const aboutProvider = document.getElementById('about-provider');
+  if (aboutProvider) aboutProvider.textContent = providerLabels[rawProvider] || 'ChatGPT';
+
+  // ── Cookie import ───────────────────────────────────────────────────────
+  const cookieImportBrowser = document.getElementById('cookie-import-browser');
+  const cookieImportProfile = document.getElementById('cookie-import-profile');
+  const cookieImportRun = document.getElementById('cookie-import-run');
+  const cookieImportRefresh = document.getElementById('cookie-import-refresh');
+  const cookieImportStatus = document.getElementById('cookie-import-status');
+  const cookieBrowserLabels = {
+    chrome: 'Chrome',
+    edge: 'Edge',
+    brave: 'Brave',
+    firefox: 'Firefox'
+  };
+
+  function postCookieMessage(payload) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify(payload));
+    }
+  }
+
+  function setCookieImportStatus(text, isError = false) {
+    if (!cookieImportStatus) return;
+    if (text && typeof text === 'object') {
+      isError = !!text.isError;
+      text = text.text || '';
+    }
+    cookieImportStatus.textContent = String(text || '');
+    cookieImportStatus.style.color = isError ? 'var(--red)' : 'var(--text2)';
+  }
+
+  function loadCookieProfiles(browser) {
+    if (!cookieImportProfile) return;
+    cookieImportProfile.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Loading profiles...';
+    cookieImportProfile.appendChild(placeholder);
+    cookieImportProfile.disabled = true;
+    setCookieImportStatus('Loading browser profiles...');
+    postCookieMessage({ type: 'cookies:getProfiles', browser });
+  }
+
+  function populateCookieProfiles(payload) {
+    if (!cookieImportProfile) return;
+    const browser = (payload && payload.browser) || '';
+    const currentBrowser = cookieImportBrowser ? cookieImportBrowser.value : '';
+    if (browser && currentBrowser && browser !== currentBrowser) return;
+    const profiles = Array.isArray(payload && payload.profiles) ? payload.profiles : [];
+    const error = payload && payload.error ? String(payload.error) : '';
+    cookieImportProfile.innerHTML = '';
+    if (error) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = error;
+      cookieImportProfile.appendChild(option);
+      cookieImportProfile.disabled = true;
+      setCookieImportStatus(error, true);
+      return;
+    }
+    if (profiles.length === 0) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No profiles found';
+      cookieImportProfile.appendChild(option);
+      cookieImportProfile.disabled = true;
+      setCookieImportStatus('No browser profiles were found for ' + (cookieBrowserLabels[currentBrowser] || currentBrowser || 'this browser') + '.', true);
+      return;
+    }
+    profiles.forEach((profile, index) => {
+      const option = document.createElement('option');
+      option.value = profile.id || profile.path || profile.name || String(index);
+      const label = profile.name || profile.id || profile.path || `Profile ${index + 1}`;
+      option.textContent = profile.isDefault ? `${label} (Default)` : label;
+      cookieImportProfile.appendChild(option);
+    });
+    cookieImportProfile.disabled = false;
+    const selected = load('cookie_import_profile', '');
+    if (selected) cookieImportProfile.value = selected;
+    if (!cookieImportProfile.value && cookieImportProfile.options.length > 0) {
+      cookieImportProfile.selectedIndex = 0;
+    }
+    setCookieImportStatus('Choose a browser profile, then import its cookies into your current YCB profile.');
+  }
+
+  function requestCookieProfiles(browser) {
+    postCookieMessage({ type: 'cookies:getProfiles', browser });
+  }
+
+  if (cookieImportBrowser) {
+    cookieImportBrowser.value = load('cookie_import_browser', 'chrome');
+    cookieImportBrowser.addEventListener('change', () => {
+      save('cookie_import_browser', cookieImportBrowser.value);
+      loadCookieProfiles(cookieImportBrowser.value);
+    });
+  }
+  if (cookieImportProfile) {
+    cookieImportProfile.addEventListener('change', () => {
+      save('cookie_import_profile', cookieImportProfile.value);
+    });
+  }
+  if (cookieImportRefresh) {
+    cookieImportRefresh.addEventListener('click', () => {
+      loadCookieProfiles(cookieImportBrowser ? cookieImportBrowser.value : 'chrome');
+    });
+  }
+  if (cookieImportRun) {
+    cookieImportRun.addEventListener('click', () => {
+      const browser = cookieImportBrowser ? cookieImportBrowser.value : 'chrome';
+      const profile = cookieImportProfile ? cookieImportProfile.value : '';
+      if (!browser || !profile) {
+        setCookieImportStatus('Choose a browser and profile first.', true);
+        return;
+      }
+      save('cookie_import_browser', browser);
+      save('cookie_import_profile', profile);
+      setCookieImportStatus(`Importing cookies from ${cookieBrowserLabels[browser] || browser}...`);
+      postCookieMessage({ type: 'cookies:import', browser, profile });
+    });
+  }
+  window.setCookieImportProfiles = populateCookieProfiles;
+  if (cookieImportBrowser) {
+    requestCookieProfiles(cookieImportBrowser.value);
+  }
+
+  const extFolderInput = document.getElementById('extension-folder-input');
+  const installExtensionBtn = document.getElementById('install-extension-btn');
+  const openChromeWebStoreBtn = document.getElementById('open-chrome-web-store');
+  const refreshExtensionsBtn = document.getElementById('refresh-extensions-btn');
+  const extensionsList = document.getElementById('extensions-list');
+
+  function postExtensionsMessage(payload) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify(payload));
+    }
+  }
+
+  function requestExtensions() {
+    postExtensionsMessage({ type: 'extensions:getAll' });
+  }
+
+  function renderExtensions(items) {
+    if (!extensionsList) return;
+    extensionsList.innerHTML = '';
+    const list = Array.isArray(items) ? items : [];
+
+    if (list.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'row-desc';
+      empty.style.padding = '10px 2px 2px';
+      empty.textContent = 'No browser extensions are installed for this profile.';
+      extensionsList.appendChild(empty);
+      return;
+    }
+
+    list.forEach(ext => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,0.03);';
+
+      const left = document.createElement('div');
+      left.style.flex = '1';
+
+      const title = document.createElement('div');
+      title.className = 'row-title';
+      title.textContent = ext.name || ext.id || 'Unknown extension';
+
+      const desc = document.createElement('div');
+      desc.className = 'row-desc';
+      desc.style.wordBreak = 'break-all';
+      desc.textContent = ext.id ? `ID: ${ext.id}` : 'No extension ID available';
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
+
+      const stateChip = document.createElement('span');
+      stateChip.className = 'chip';
+      stateChip.textContent = ext.enabled ? 'Enabled' : 'Disabled';
+      stateChip.style.background = ext.enabled ? 'rgba(81, 167, 81, 0.16)' : 'rgba(95, 99, 104, 0.18)';
+      stateChip.style.color = ext.enabled ? 'var(--green)' : 'var(--text2)';
+
+      meta.appendChild(stateChip);
+
+      left.appendChild(title);
+      left.appendChild(desc);
+      left.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;gap:8px;align-items:center;flex-shrink:0;';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.textContent = ext.enabled ? 'Disable' : 'Enable';
+      toggle.style.cssText = 'padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);cursor:pointer;';
+      toggle.addEventListener('click', () => {
+        postExtensionsMessage({ type: 'extensions:toggle', id: ext.id, enabled: !ext.enabled });
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.style.cssText = 'padding:8px 12px;border-radius:8px;border:1px solid rgba(234,67,53,0.4);background:rgba(234,67,53,0.08);color:#f28b82;cursor:pointer;';
+      remove.addEventListener('click', () => {
+        postExtensionsMessage({ type: 'extensions:remove', id: ext.id });
+      });
+
+      actions.appendChild(toggle);
+      actions.appendChild(remove);
+
+      row.appendChild(left);
+      row.appendChild(actions);
+      extensionsList.appendChild(row);
+    });
+  }
+
+  window.setExtensions = renderExtensions;
+
+  if (installExtensionBtn) {
+    installExtensionBtn.addEventListener('click', () => {
+      const path = extFolderInput ? extFolderInput.value.trim() : '';
+      if (!path) {
+        showToast('Paste an extension folder path first');
+        return;
+      }
+      postExtensionsMessage({ type: 'extensions:installPath', path });
+    });
+  }
+
+  if (openChromeWebStoreBtn) {
+    openChromeWebStoreBtn.addEventListener('click', () => {
+      postExtensionsMessage({ type: 'extensions:openManager' });
+    });
+  }
+
+  if (refreshExtensionsBtn) {
+    refreshExtensionsBtn.addEventListener('click', requestExtensions);
+  }
+
+  requestExtensions();
+
+  // ── Incognito AI toggle ───────────────────────────────────────────────────
+  const incognitoAiToggle = document.getElementById('toggle-incognito-ai');
+  const incognitoAiWarning = document.getElementById('incognito-ai-warning');
+  const adBlockToggle = document.getElementById('toggle-ad-blocker');
+  if (incognitoAiToggle && incognitoAiWarning && load('incognito_ai_enabled', 'false') === 'true') {
+    incognitoAiToggle.classList.add('on');
+    incognitoAiWarning.style.display = 'block';
+  }
+  if (incognitoAiToggle && incognitoAiWarning) incognitoAiToggle.addEventListener('click', () => {
+    const on = incognitoAiToggle.classList.toggle('on');
+    save('incognito_ai_enabled', on ? 'true' : 'false');
+    incognitoAiWarning.style.display = on ? 'block' : 'none';
+    showToast(on ? 'Service enabled in Incognito' : 'Service disabled in Incognito');
+  });
+
+  // ── Default Browser ───────────────────────────────────────────────────────
+  function setDefaultStatus(isDefault) {
+    const status = document.getElementById('default-status');
+    const btn = document.getElementById('btn-set-default');
+    if (!status || !btn) return;
+    if (isDefault) {
+      status.textContent = '✓ YCB is already your default browser';
+      status.className = 'row-desc success';
+      btn.textContent = '✓ Already default';
+      btn.disabled = true;
+    } else {
+      status.textContent = 'YCB is not set as your default browser';
+      status.className = 'row-desc';
+      btn.textContent = 'Set as default';
+      btn.disabled = false;
+    }
+  }
+
+  const setDefaultBtn = document.getElementById('btn-set-default');
+  if (setDefaultBtn) setDefaultBtn.addEventListener('click', () => {
+    window.chrome.webview.postMessage(JSON.stringify({type: 'setDefault'}));
+    showToast('Opening Default Apps settings…');
+  });
+
+  // ── Theme toggle ──────────────────────────────────────────────────────────
+  const themeSel = document.getElementById('theme-select');
+  const themeDesc = document.getElementById('theme-desc');
+  const currentTheme = load('browser_theme', 'dark');
+  if (themeSel) themeSel.value = currentTheme;
+  if (themeDesc) themeDesc.textContent = 'Currently using ' + currentTheme + ' mode';
+  if (themeSel) themeSel.addEventListener('change', () => {
+    save('browser_theme', themeSel.value);
+    if (themeDesc) themeDesc.textContent = 'Currently using ' + themeSel.value + ' mode';
+    applySettingsTheme(themeSel.value);
+    showToast('Theme changed to ' + themeSel.value);
+  });
+
+  // ── Email provider ────────────────────────────────────────────────────────
+  const emailSel = document.getElementById('email-provider-select');
+  if (emailSel) emailSel.value = load('email_provider', 'gmail');
+  if (emailSel) emailSel.addEventListener('change', () => {
+    save('email_provider', emailSel.value);
+    showToast('Email provider: ' + emailSel.options[emailSel.selectedIndex].text);
+  });
+
+  // ── Telemetry toggle ──────────────────────────────────────────────────────
+  const telemetryToggle = document.getElementById('toggle-telemetry');
+  const telemetryDesc   = document.getElementById('telemetry-desc');
+  const telemetryAppreciate = document.getElementById('telemetry-appreciate');
+  const telemetryOffNotice  = document.getElementById('telemetry-off-notice');
+
+  function applyTelemetryUI(on) {
+    if (!telemetryToggle || !telemetryDesc || !telemetryAppreciate || !telemetryOffNotice) return;
+    telemetryToggle.classList.toggle('on', on);
+    telemetryDesc.textContent = on ? 'Helps us detect crashes and improve stability' : 'No diagnostic data is being sent';
+    telemetryAppreciate.style.display = on ? '' : 'none';
+    telemetryOffNotice.style.display  = on ? 'none' : '';
+  }
+
+  applyTelemetryUI(load('telemetry_enabled', 'true') !== 'false');
+  if (telemetryToggle) telemetryToggle.addEventListener('click', () => {
+    const on = !telemetryToggle.classList.contains('on');
+    applyTelemetryUI(on);
+    save('telemetry_enabled', on ? 'true' : 'false');
+    showToast(on ? 'Diagnostic logging enabled' : 'Diagnostic logging disabled');
+  });
+
+  if (adBlockToggle) {
+    adBlockToggle.classList.toggle('on', load('ad_blocker_enabled', 'on') === 'on');
+    adBlockToggle.addEventListener('click', () => {
+      const on = !adBlockToggle.classList.contains('on');
+      adBlockToggle.classList.toggle('on', on);
+      save('ad_blocker_enabled', on ? 'on' : 'off');
+      showToast(on ? 'uBlock Origin enabled' : 'uBlock Origin disabled');
+    });
+  }
+
+  // ── Load settings from C# backend ────────────────────────────────────────
+  window.loadSettings = function(data) {
+    if (!data) return;
+    // bookmarks_bar
+    if (data.bookmarks_bar !== undefined) {
+      const on = data.bookmarks_bar === 'on';
+      if (bookmarksToggle) bookmarksToggle.classList.toggle('on', on);
+      localStorage.setItem('bookmarks_bar', data.bookmarks_bar);
+    }
+    // search_engine
+    if (data.search_engine !== undefined) {
+      if (searchSel) searchSel.value = data.search_engine;
+      localStorage.setItem('search_engine', data.search_engine);
+    }
+    // startup_mode
+    if (data.startup_mode !== undefined) {
+      const radio = document.getElementById('startup-' + data.startup_mode);
+      if (radio) radio.checked = true;
+      localStorage.setItem('startup_mode', data.startup_mode);
+    }
+    // ai_provider
+    if (data.ai_provider !== undefined) {
+      const provider = normalizeProvider(data.ai_provider);
+      if (providerSel) providerSel.value = provider;
+      localStorage.setItem('ai_provider', provider);
+      if (aboutProvider) aboutProvider.textContent = providerLabels[provider] || provider;
+    }
+    // incognito_ai_enabled
+    if (data.incognito_ai_enabled !== undefined) {
+      const on = data.incognito_ai_enabled === 'true';
+      if (incognitoAiToggle) incognitoAiToggle.classList.toggle('on', on);
+      if (incognitoAiWarning) incognitoAiWarning.style.display = on ? 'block' : 'none';
+      localStorage.setItem('incognito_ai_enabled', data.incognito_ai_enabled);
+    }
+    // browser_theme
+    if (data.browser_theme !== undefined) {
+      if (themeSel) themeSel.value = data.browser_theme;
+      if (themeDesc) themeDesc.textContent = 'Currently using ' + data.browser_theme + ' mode';
+      localStorage.setItem('browser_theme', data.browser_theme);
+      applySettingsTheme(data.browser_theme);
+    }
+    // telemetry_enabled
+    if (data.telemetry_enabled !== undefined) {
+      const on = data.telemetry_enabled !== 'false';
+      applyTelemetryUI(on);
+      localStorage.setItem('telemetry_enabled', data.telemetry_enabled);
+    }
+    // user_id
+    if (data.user_id) {
+      const el = document.getElementById('about-user-id');
+      if (el) {
+        el.textContent = data.user_id;
+        el.addEventListener('click', () => {
+          navigator.clipboard.writeText(data.user_id).then(() => {
+            const prev = el.textContent;
+            el.textContent = 'Copied!';
+            el.style.color = 'var(--green)';
+            setTimeout(() => { el.textContent = prev; el.style.color = ''; }, 1500);
+          });
+        });
+      }
+    }
+    if (data.ai_enabled !== undefined) {
+      if (aiEnabledToggle) aiEnabledToggle.classList.toggle('on', data.ai_enabled !== 'off');
+      localStorage.setItem('ai_enabled', data.ai_enabled);
+    }
+    if (data.profile_name !== undefined) {
+      const profileName = document.getElementById('profile-name');
+      const profileAvatar = document.getElementById('profile-avatar');
+      const name = data.profile_name || 'YCB Profile';
+      if (profileName) profileName.textContent = name;
+      if (profileAvatar) {
+        profileAvatar.textContent = (data.profile_initial || name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+        if (data.profile_color) profileAvatar.style.background = data.profile_color;
+      }
+    }
+    if (data.ad_blocker_enabled !== undefined && adBlockToggle) {
+      const on = data.ad_blocker_enabled === 'on';
+      adBlockToggle.classList.toggle('on', on);
+      localStorage.setItem('ad_blocker_enabled', data.ad_blocker_enabled);
+    }
+    // home_page
+    if (data.home_page !== undefined) {
+      const homeInput = document.getElementById('home-page-input');
+      if (homeInput) homeInput.value = data.home_page;
+      localStorage.setItem('home_page', data.home_page);
+    }
+    // email_provider
+    if (data.email_provider !== undefined) {
+      const ep = document.getElementById('email-provider-select');
+      if (ep) ep.value = data.email_provider;
+      localStorage.setItem('email_provider', data.email_provider);
+    }
+  };
+
+  // Request user ID from C# as soon as the page is ready
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.postMessage({ type: 'settings:getUserId' });
+  }
+</script>
+</body>
+</html>

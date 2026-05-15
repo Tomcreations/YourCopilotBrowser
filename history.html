@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>History – YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#ffffff; --panel:#ffffff; --field:#f1f3f4; --text:#111111;
+      --text2:#111111; --muted:#3c4043; --border:rgba(0,0,0,0.10);
+      --hover:rgba(0,0,0,0.05); --accent:#1a73e8;
+    }
+    html.dark {
+      --bg:#202124; --panel:#292a2d; --field:#3c4043; --text:#f8f9fa;
+      --text2:#f8f9fa; --muted:#c9ccd1; --border:rgba(255,255,255,0.10);
+      --hover:rgba(255,255,255,0.07); --accent:#8ab4f8;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 14px; min-height: 100vh;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--panel); border-bottom: 1px solid var(--border);
+      padding: 18px 32px 14px;
+    }
+    header h1 { font-size: 22px; font-weight: 400; margin-bottom: 12px; }
+    .toolbar { display: flex; gap: 10px; align-items: center; }
+    .search-wrap {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+      background: var(--field); border-radius: 8px; padding: 7px 12px;
+    }
+    .search-wrap svg { flex-shrink: 0; opacity: 0.5; }
+    .search-wrap input {
+      background: none; border: none; outline: none;
+      color: var(--text); font-size: 14px; width: 100%;
+    }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .btn-clear {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 7px 16px;
+      font-size: 13px; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-clear:hover { background: var(--hover); }
+
+    #content { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    .date-group { margin-bottom: 24px; }
+    .date-label {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+      color: var(--muted); text-transform: uppercase;
+      padding: 4px 0 8px; border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .entry {
+      display: flex; align-items: center; gap: 12px;
+      padding: 9px 10px; border-radius: 8px; cursor: pointer;
+      transition: background 0.12s;
+    }
+    .entry:hover { background: var(--hover); }
+    .favicon {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border-radius: 3px; object-fit: contain;
+    }
+    .favicon-placeholder {
+      width: 16px; height: 16px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0.4; font-size: 13px;
+    }
+    .entry-title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .entry-url {
+      font-size: 12px; color: var(--muted);
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      max-width: 340px;
+    }
+    .entry-time { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+    .empty {
+      text-align: center; padding: 80px 20px;
+      color: var(--muted); display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+    }
+    .empty svg { opacity: 0.3; }
+    .empty p { font-size: 15px; color: var(--muted); }
+    .empty small { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>History</h1>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input id="search" type="text" placeholder="Search history…">
+      </div>
+      <button class="btn-clear" id="btn-clear">Clear history</button>
+    </div>
+  </header>
+
+  <div id="content">
+    <div class="empty" id="empty" style="display:none">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/>
+      </svg>
+      <p>No history yet</p>
+      <small>Pages you visit will appear here.</small>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <script>
+    function setTheme(theme) {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }
+    window.setTheme = setTheme;
+    setTheme(localStorage.getItem('browser_theme') || window.__ycbTheme || 'light');
+
+    // WebView2 bridge
+    const ycbAPI = {
+      postMessage: (type, data) => {
+        if (window.chrome && window.chrome.webview) {
+          window.chrome.webview.postMessage({ type, ...data });
+        }
+      },
+      openUrl: (url) => ycbAPI.postMessage('history:open', { url }),
+      clearHistory: () => ycbAPI.postMessage('history:clear')
+    };
+    
+    let allEntries = [];
+
+    function formatTime(ts) {
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function dateLabel(ts) {
+      const d = new Date(ts);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+      const t = new Date(d); t.setHours(0,0,0,0);
+      if (t.getTime() === today.getTime()) return 'Today';
+      if (t.getTime() === yesterday.getTime()) return 'Yesterday';
+      return d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+
+    function renderList(entries) {
+      const list = document.getElementById('list');
+      const empty = document.getElementById('empty');
+      list.innerHTML = '';
+      if (!entries.length) { empty.style.display = 'flex'; return; }
+      empty.style.display = 'none';
+
+      const groups = [];
+      let curLabel = null, curGroup = null;
+      for (const e of entries) {
+        const lbl = dateLabel(e.visitedAt);
+        if (lbl !== curLabel) {
+          curLabel = lbl;
+          curGroup = { label: lbl, entries: [] };
+          groups.push(curGroup);
+        }
+        curGroup.entries.push(e);
+      }
+
+      for (const g of groups) {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'date-group';
+        const lblEl = document.createElement('div');
+        lblEl.className = 'date-label';
+        lblEl.textContent = g.label;
+        groupEl.appendChild(lblEl);
+
+        for (const e of g.entries) {
+          const el = document.createElement('div');
+          el.className = 'entry';
+          el.title = e.url;
+
+          let faviconHtml;
+          if (e.favicon) {
+            faviconHtml = `<img class="favicon" src="${e.favicon}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">` +
+              `<span class="favicon-placeholder" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></span>`;
+          } else {
+            faviconHtml = `<span class="favicon-placeholder"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/></svg></span>`;
+          }
+
+          let displayUrl = e.url;
+          try { displayUrl = new URL(e.url).hostname.replace(/^www\./, ''); } catch {}
+
+          el.innerHTML = faviconHtml +
+            `<span class="entry-title">${escHtml(e.title || e.url)}</span>` +
+            `<span class="entry-url">${escHtml(displayUrl)}</span>` +
+            `<span class="entry-time">${formatTime(e.visitedAt)}</span>`;
+
+          el.addEventListener('click', () => {
+            ycbAPI.openUrl(e.url);
+          });
+          groupEl.appendChild(el);
+        }
+        list.appendChild(groupEl);
+      }
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Called by C# to load history
+    window.loadHistory = function(data) {
+      allEntries = data || [];
+      applyFilter();
+    };
+
+    function applyFilter() {
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      if (!q) { renderList(allEntries); return; }
+      const filtered = allEntries.filter(e =>
+        (e.title && e.title.toLowerCase().includes(q)) ||
+        (e.url  && e.url.toLowerCase().includes(q))
+      );
+      renderList(filtered);
+    }
+
+    document.getElementById('search').addEventListener('input', applyFilter);
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      ycbAPI.clearHistory();
+      allEntries = [];
+      renderList([]);
+    });
+
+    // Request history on load
+    ycbAPI.postMessage('history:getAll');
+  </script>
+</body>
+</html>

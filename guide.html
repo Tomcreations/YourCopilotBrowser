@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:">
+  <title>Welcome to YCB</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #202124; color: #e8eaed;
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 14px; min-height: 100vh;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #1a1b26 0%, #202124 60%);
+      text-align: center; padding: 56px 24px 40px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .hero-logo {
+      width: 72px; height: 72px; border-radius: 18px;
+      background: linear-gradient(135deg, #8ab4f8, #5e97f6);
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; box-shadow: 0 8px 32px rgba(138,180,248,0.3);
+    }
+    .hero h1 { font-size: 32px; font-weight: 600; color: #e8eaed; margin-bottom: 10px; }
+    .hero p  { font-size: 16px; color: #9aa0a6; max-width: 480px; margin: 0 auto 28px; line-height: 1.6; }
+    .hero-version {
+      display: inline-block; background: rgba(138,180,248,0.12);
+      border: 1px solid rgba(138,180,248,0.25); border-radius: 20px;
+      padding: 4px 14px; font-size: 12px; color: #8ab4f8;
+    }
+
+    /* Content */
+    #content { max-width: 860px; margin: 0 auto; padding: 40px 16px 80px; }
+
+    .section-title {
+      font-size: 11px; font-weight: 600; color: #9aa0a6;
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 16px; margin-top: 40px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    /* Feature grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+    .card {
+      background: #292a2d; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 20px;
+      transition: border-color .15s, background .15s;
+    }
+    .card:hover { background: #2f3033; border-color: rgba(138,180,248,0.25); }
+    .card-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+    }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; color: #e8eaed; }
+    .card p  { font-size: 13px; color: #9aa0a6; line-height: 1.55; }
+
+    /* Tips list */
+    .tips { background: #292a2d; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; overflow: hidden; }
+    .tip {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .tip:last-child { border-bottom: none; }
+    .tip-icon { flex-shrink: 0; margin-top: 1px; }
+    .tip-body h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+    .tip-body p  { font-size: 12px; color: #9aa0a6; line-height: 1.5; }
+
+    kbd {
+      background: #3c4043; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 4px; padding: 2px 6px; font-size: 11px;
+      font-family: 'Segoe UI', sans-serif; color: #e8eaed;
+    }
+
+    /* CTA */
+    .cta { text-align: center; margin-top: 48px; }
+    .btn-primary {
+      background: #8ab4f8; color: #202124; border: none;
+      border-radius: 8px; padding: 12px 32px; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover { background: #aecbfa; }
+    .cta p { font-size: 12px; color: #9aa0a6; margin-top: 10px; }
+
+    .test-card {
+      background: #292a2d; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px; padding: 20px;
+    }
+    .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
+    .metric {
+      background: #202124; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 14px;
+    }
+    .metric-label { color: #9aa0a6; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .metric-value { color: #e8eaed; font-size: 24px; font-weight: 650; margin-top: 6px; }
+    .metric-note { color: #9aa0a6; font-size: 12px; line-height: 1.5; margin-top: 6px; }
+    .spec-list { display: grid; gap: 8px; margin-top: 16px; color: #9aa0a6; font-size: 12px; line-height: 1.5; }
+    .spec-list b { color: #e8eaed; font-weight: 600; }
+
+    .faq { background: #292a2d; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; }
+    .faq details { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .faq details:last-child { border-bottom: 0; }
+    .faq summary {
+      list-style: none; cursor: pointer; padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      color: #e8eaed; font-size: 14px; font-weight: 500;
+    }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after {
+      content: "⌄"; width: 34px; height: 34px; border-radius: 50%;
+      display: grid; place-items: center; background: #3c4043; color: #e8eaed;
+      font-size: 18px; transition: transform .16s ease, background .16s ease;
+    }
+    .faq details[open] summary::after { transform: rotate(180deg); background: #4a4d52; }
+    .faq p { color: #9aa0a6; font-size: 13px; line-height: 1.65; padding: 0 20px 18px; }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="hero-logo">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="16" stroke="#202124" stroke-width="2.5"/>
+        <path d="M20 6 C14 6 9 11 9 18 C9 24 13 28 20 30 C27 28 31 24 31 18 C31 11 26 6 20 6 Z"
+              fill="#202124" opacity="0.3"/>
+        <ellipse cx="20" cy="18" rx="8" ry="5" stroke="#202124" stroke-width="2"/>
+        <line x1="9" y1="18" x2="31" y2="18" stroke="#202124" stroke-width="2"/>
+        <line x1="20" y1="6" x2="20" y2="30" stroke="#202124" stroke-width="2"/>
+      </svg>
+    </div>
+    <h1>Welcome to YCB Browser</h1>
+    <p>A fast, private, WebView2-powered browser built for Windows. Here's everything you need to know to get started.</p>
+    <span class="hero-version">Version 1.0</span>
+  </div>
+
+  <div id="content">
+
+    <p class="section-title">Core Features</p>
+    <div class="grid">
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(138,180,248,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="2">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+        </div>
+        <h3>Tabs</h3>
+        <p>Open multiple tabs with <kbd>Ctrl+T</kbd>. Middle-click a link to open it in a new tab. Click the × to close. Switch tabs by clicking them.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(129,201,149,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3>Address Bar</h3>
+        <p>Type a URL or search query and press <kbd>Enter</kbd>. It automatically detects URLs vs. searches using your chosen search engine.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(250,189,5,0.12)">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#fabd05" stroke-width="1.4">
+            <path d="M10 2 L12 7 L17.5 7 L13.25 10.2 L14.93 15.5 L10 12.5 L5.07 15.5 L6.75 10.2 L2.5 7 L8 7 Z"/>
+          </svg>
+        </div>
+        <h3>Bookmarks</h3>
+        <p>Click the ★ star icon in the address bar to bookmark any page. Click it again to remove the bookmark. Saved bookmarks appear in the bookmarks bar (enable in Settings).</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(242,139,130,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f28b82" stroke-width="2">
+            <rect x="5" y="11" width="14" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <h3>Bitwarden</h3>
+        <p>Open <b>⋮ → Password Manager</b> to sign in, sync your vault, and autofill passwords, cards, emails, and phone numbers with Bitwarden.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(138,180,248,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <h3>Downloads</h3>
+        <p>Files download silently in the background — no Edge pop-up. A shelf appears at the bottom showing progress. View all downloads via <b>⋮ → Downloads</b> or <kbd>Ctrl+J</kbd>.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(129,201,149,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>
+          </svg>
+        </div>
+        <h3>Audio Indicator</h3>
+        <p>When a tab is playing audio, a 🔊 speaker icon appears on that tab so you can instantly see which tab has sound.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(250,189,5,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fabd05" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <h3>Incognito Mode</h3>
+        <p>Open a private window with <kbd>Ctrl+Shift+N</kbd>. History, cookies and passwords are never saved. An incognito bar is shown at the top as a reminder.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon" style="background:rgba(138,180,248,0.12)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </div>
+        <h3>Settings</h3>
+        <p>Access Settings via <b>⋮ → Settings</b>. Change search engine, theme (dark/light), home page, startup behaviour, and bookmarks bar visibility.</p>
+      </div>
+
+    </div>
+
+    <p class="section-title" style="margin-top:40px">Keyboard Shortcuts</p>
+    <div class="tips">
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+T</kbd></span>
+        <div class="tip-body"><h4>New Tab</h4><p>Open a fresh tab with your home page or new tab page.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+W</kbd></span>
+        <div class="tip-body"><h4>Close Tab</h4><p>Close the currently active tab. Closes the window if it's the last tab.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+H</kbd></span>
+        <div class="tip-body"><h4>History</h4><p>Browse your full browsing history and search through past visits.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+J</kbd></span>
+        <div class="tip-body"><h4>Downloads</h4><p>Open the downloads page to see all your downloaded files.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+L</kbd></span>
+        <div class="tip-body"><h4>Focus Address Bar</h4><p>Jump to the address bar to type a new URL or search query.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+Shift+N</kbd></span>
+        <div class="tip-body"><h4>Incognito Window</h4><p>Open a new private window — nothing is saved to history or passwords.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Alt+←</kbd></span>
+        <div class="tip-body"><h4>Back / Forward</h4><p>Navigate back with <kbd>Alt+←</kbd> and forward with <kbd>Alt+→</kbd>.</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl+R</kbd></span>
+        <div class="tip-body"><h4>Reload</h4><p>Refresh the current page. Use <kbd>Ctrl+Shift+R</kbd> to force-reload (bypass cache).</p></div>
+      </div>
+      <div class="tip">
+        <span class="tip-icon"><kbd>Ctrl++</kbd> / <kbd>Ctrl+-</kbd></span>
+        <div class="tip-body"><h4>Zoom In / Out</h4><p>Increase or decrease the zoom level of the current page.</p></div>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:40px">Bitwarden Tips</p>
+    <div class="tips">
+      <div class="tip">
+        <div class="tip-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8ab4f8" stroke-width="2">
+            <rect x="5" y="11" width="14" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <div class="tip-body">
+          <h4>Sign in</h4>
+          <p>Use <b>⋮ → Password Manager</b> to sign in with Bitwarden, then sync your vault once the app unlocks.</p>
+        </div>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="2">
+            <polyline points="9 11 12 14 22 4"/>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+          </svg>
+        </div>
+        <div class="tip-body">
+          <h4>Autofill</h4>
+          <p>On any login page for a saved site, YCB shows matching Bitwarden items so you can autofill usernames, passwords, cards, and identities quickly.</p>
+        </div>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa0a6" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <div class="tip-body">
+          <h4>Edit items</h4>
+          <p>Use the password manager page inside YCB to edit items, review cards, and manage identities without leaving the browser.</p>
+        </div>
+      </div>
+      <div class="tip">
+        <div class="tip-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fabd05" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="tip-body">
+          <h4>Secure vault</h4>
+          <p>Bitwarden keeps the vault encrypted and synced. YCB only connects to it while you are signed in.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="ai-setup-section">
+    <p class="section-title" style="margin-top:40px">Using the browser sidebar</p>
+
+    <div style="background:#292a2d;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;">
+      <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;gap:16px;align-items:center;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#8ab4f8;color:#202124;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:#9aa0a6;margin-bottom:8px;">Open the sidebar from the toolbar, then choose the site you want:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <span class="chip">ChatGPT</span>
+            <span class="chip">Gemini</span>
+            <span class="chip">Claude</span>
+            <span class="chip">Microsoft Copilot</span>
+            <span class="chip">Grok</span>
+            <span class="chip">Meta</span>
+            <span class="chip">GitHub Copilot</span>
+            <span class="chip">Perplexity</span>
+            <span class="chip">DeepSeek</span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:18px 24px;display:flex;gap:16px;align-items:center;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#8ab4f8;color:#202124;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:#9aa0a6;margin-bottom:8px;">Drag the divider beside the sidebar to resize it or pull it closed like a window edge.</div>
+          <div style="background:#1a1b1e;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <code style="font-family:'Cascadia Code','Consolas',monospace;font-size:13px;color:#81c995;">Grab the edge and drag</code>
+            <button onclick="window.chrome.webview.postMessage('__guide__:DISMISS')" style="flex-shrink:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:4px 10px;color:#9aa0a6;font-size:11px;cursor:pointer;">Try it</button>
+          </div>
+        </div>
+      </div>
+      <div style="padding:18px 24px;display:flex;gap:16px;align-items:center;">
+        <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#8ab4f8;color:#202124;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:#9aa0a6;margin-bottom:8px;">Your provider choice sticks. Refresh keeps the same provider instead of snapping back.</div>
+          <div style="font-size:12px;color:#9aa0a6;">If you change providers in Settings, YCB saves it immediately.</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:40px">Questions people ask</p>
+    <div class="faq">
+      <details>
+        <summary>Why does YCB look similar to other browsers?</summary>
+        <p>That is intentional. Familiar browser shapes, tabs, shortcuts, and page layouts make YCB easier to understand immediately, especially for people coming from Chrome, Edge, Brave, or Firefox.</p>
+      </details>
+      <details>
+        <summary>Does YCB replace Chrome?</summary>
+        <p>It can be used as a normal browser, but it is still a young project. It focuses on a clean Windows browser experience with profiles, extensions, ad blocking, Bitwarden support, and optional AI services.</p>
+      </details>
+      <details>
+        <summary>Why can memory usage change between tests?</summary>
+        <p>Web pages decide how much code, video, ads, scripts, and background work they load. YouTube in particular can vary a lot between sessions, so this guide shows the exact device and method used for the comparison.</p>
+      </details>
+      <details>
+        <summary>Where do I get support?</summary>
+        <p>Use the Support page on the YCB website. It has an embedded ticket system so you can submit an issue and track replies in one place.</p>
+      </details>
+    </div>
+
+    <div class="cta">
+      <button class="btn-primary" onclick="window.chrome.webview.postMessage('__guide__:DISMISS')">
+        Get Browsing
+      </button>
+      <p>You can always reopen this guide from <b>⋮ → Help &amp; Guide</b></p>
+    </div>
+
+  </div>
+
+</body>
+</html>

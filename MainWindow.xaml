@@ -1,0 +1,694 @@
+<Window x:Class="YCB.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        x:Name="BrowserWindow"
+        Title="YCB" Height="800" Width="1280"
+        WindowStyle="SingleBorderWindow" AllowsTransparency="False" Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        PreviewMouseDown="Window_PreviewMouseDown">
+    
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="5" GlassFrameThickness="-1" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+    
+    <Grid x:Name="MainGrid" Background="#202124">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36"/>  <!-- Tab strip: 36px -->
+            <RowDefinition Height="46"/>  <!-- Toolbar: 46px -->
+            <RowDefinition x:Name="BookmarksBarRow" Height="0"/>  <!-- Bookmarks bar -->
+            <RowDefinition x:Name="IncognitoBarRow" Height="0"/>  <!-- Incognito bar -->
+            <RowDefinition Height="*"/>   <!-- Content -->
+            <RowDefinition x:Name="DownloadShelfRow" Height="0"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Tab Strip: outer grid locks window controls at right, inner grid handles tabs+drag -->
+        <Grid Grid.Row="0" x:Name="TabStrip" Background="#202124" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>    <!-- TabsArea: fills everything left of window controls -->
+                <ColumnDefinition Width="Auto"/> <!-- Window controls: always pinned right -->
+            </Grid.ColumnDefinitions>
+            
+            <!-- Inner grid: tabs | new-tab btn | drag -->
+            <Grid x:Name="TabsArea" Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>              <!-- TabsScroller: auto, capped by MaxWidth in C# -->
+                    <ColumnDefinition Width="Auto"/>              <!-- New tab button -->
+                    <ColumnDefinition Width="*" MinWidth="60"/>   <!-- Drag area: always ≥60px -->
+                </Grid.ColumnDefinitions>
+                
+                <ScrollViewer x:Name="TabsScroller" Grid.Column="0"
+                              HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                              Margin="4,4,0,0" VerticalAlignment="Bottom">
+                    <StackPanel x:Name="TabsPanel" Orientation="Horizontal"/>
+                </ScrollViewer>
+                
+                <Button x:Name="NewTabBtn" Click="AddTab_Click" Grid.Column="1"
+                        Width="26" Height="26" Margin="2,0,2,3" VerticalAlignment="Bottom"
+                        Style="{StaticResource NewTabBtnStyle}" ToolTip="New tab">
+                    <Path x:Name="NewTabIcon" Data="M6 1 L6 11 M1 6 L11 6"
+                          Stroke="#9aa0a6" StrokeThickness="1.5"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Width="12" Height="12" Stretch="None"/>
+                </Button>
+                
+                <Border x:Name="DragArea" Grid.Column="2" Background="#01000000"
+                        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"/>
+            </Grid>
+            
+            <!-- Window Controls: always at right in outer Col 1 — tabs can never push these away -->
+            <StackPanel x:Name="WinControls" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="MinBtn" Click="Minimize_Click" Style="{StaticResource WinBtnStyle}">
+                    <Rectangle x:Name="MinIcon" Width="10" Height="1.5" Fill="#9aa0a6"/>
+                </Button>
+                <Button x:Name="MaxRestoreBtn" Click="Maximize_Click" Style="{StaticResource WinBtnStyle}">
+                    <Rectangle x:Name="MaxIcon" Width="8.5" Height="8.5"
+                               Stroke="#9aa0a6" StrokeThickness="1.5" Fill="Transparent"/>
+                </Button>
+                <Button x:Name="CloseBtn" Click="Close_Click" Style="{StaticResource CloseWinBtnStyle}">
+                    <Path x:Name="CloseIcon" Data="M1 1 L9 9 M9 1 L1 9"
+                          Stroke="#9aa0a6" StrokeThickness="1.5"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Width="10" Height="10" Stretch="None"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+        
+        <!-- TOOLBAR - #35363a, height 46px, padding 0 6px, gap 2px -->
+        <Grid Grid.Row="1" x:Name="Toolbar" Background="#35363a">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>  <!-- Nav cluster -->
+                <ColumnDefinition Width="*"/>     <!-- Omnibox -->
+                <ColumnDefinition Width="Auto"/>  <!-- Actions -->
+            </Grid.ColumnDefinitions>
+            
+            <!-- Navigation Cluster -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="6,0,0,0">
+                <Button x:Name="BackBtn" Click="Back_Click" Style="{StaticResource NavBtnStyle}" 
+                        ToolTip="Back" IsEnabled="False">
+                    <Path x:Name="BackIcon" Data="M12 4 L7 10 L12 16" 
+                          Stroke="#9aa0a6" StrokeThickness="1.8"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                          Width="20" Height="20" Stretch="Uniform"/>
+                </Button>
+                <Button x:Name="ForwardBtn" Click="Forward_Click" Style="{StaticResource NavBtnStyle}" 
+                        ToolTip="Forward" IsEnabled="False">
+                    <Path x:Name="ForwardIcon" Data="M8 4 L13 10 L8 16" 
+                          Stroke="#9aa0a6" StrokeThickness="1.8"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                          Width="20" Height="20" Stretch="Uniform"/>
+                </Button>
+                <Button x:Name="RefreshBtn" Click="Refresh_Click" Style="{StaticResource NavBtnStyle}" 
+                        ToolTip="Reload page">
+                    <Canvas x:Name="RefreshIconCanvas" Width="20" Height="20" RenderTransformOrigin="0.5,0.5">
+                        <Canvas.RenderTransform>
+                            <RotateTransform Angle="0"/>
+                        </Canvas.RenderTransform>
+                        <Path x:Name="RefreshArc" Data="M15 9 A6 6 0 1 1 3 9" 
+                              Stroke="#9aa0a6" StrokeThickness="1.8" StrokeStartLineCap="Round" Fill="Transparent"/>
+                        <Path x:Name="RefreshArrow" Data="M15 5 L15 9 L11 9" 
+                              Stroke="#9aa0a6" StrokeThickness="1.8" 
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    </Canvas>
+                </Button>
+            </StackPanel>
+            
+            <!-- Omnibox: flex 1, margin 0 8px, border-radius 16px, height 32px -->
+            <Border Grid.Column="1" x:Name="OmniboxBorder" 
+                    Background="#292b2f" CornerRadius="16" 
+                    Margin="8,7" Height="32">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>  <!-- Security icon -->
+                        <ColumnDefinition Width="*"/>     <!-- Input -->
+                        <ColumnDefinition Width="Auto"/>  <!-- Bookmark -->
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Security icon (clickable — opens site info panel) -->
+                    <Canvas x:Name="SecurityIconCanvas" Grid.Column="0" Width="13" Height="13" Margin="10,0,6,0"
+                            Cursor="Hand" MouseLeftButtonDown="SecurityIcon_Click" Background="Transparent">
+                        <Path x:Name="SecurityShield" Data="M7 1 L2 3.5 L2 7.5 C2 10 4.5 12.5 7 13 C9.5 12.5 12 10 12 7.5 L12 3.5 Z" 
+                              Stroke="#81c995" StrokeThickness="1.2" Fill="Transparent"/>
+                        <Path x:Name="SecurityCheck" Data="M5 7 L6.5 8.5 L9 5" 
+                              Stroke="#81c995" StrokeThickness="1.2" 
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    </Canvas>
+                    
+                    <!-- URL Input with placeholder overlay -->
+                    <Grid Grid.Column="1">
+                        <TextBox x:Name="UrlBox"
+                                 Background="Transparent" Foreground="#e8eaed" CaretBrush="#8ab4f8"
+                                 BorderThickness="0" VerticalContentAlignment="Center"
+                                 FontSize="13" FontFamily="Segoe UI" Padding="0"
+                                 KeyDown="UrlBox_KeyDown" PreviewKeyDown="UrlBox_PreviewKeyDown" PreviewTextInput="UrlBox_PreviewTextInput" GotFocus="UrlBox_GotFocus" LostFocus="UrlBox_LostFocus" TextChanged="UrlBox_TextChanged"/>
+                        <!-- Placeholder text for URL bar -->
+                        <TextBlock x:Name="UrlPlaceholder"
+                                   Text="Search with Google"
+                                   Foreground="#5f6368"
+                                   FontSize="13" FontFamily="Segoe UI"
+                                   VerticalAlignment="Center"
+                                   IsHitTestVisible="False"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                    
+                    <!-- Bookmark Button -->
+                    <Button Grid.Column="2" x:Name="BookmarkBtn"
+                            Style="{StaticResource OmniBtnStyle}" 
+                            Click="BookmarkBtn_Click"
+                            ToolTip="Bookmark this tab" Margin="0,0,4,0">
+                        <Path x:Name="BookmarkStarPath"
+                              Data="M7.5 1.5 L9 6 L14 6 L10.25 8.7 L11.68 13.25 L7.5 10.5 L3.32 13.25 L4.75 8.7 L1 6 L5.95 6 Z" 
+                              Stroke="#9aa0a6" StrokeThickness="1.2" Fill="Transparent"
+                              Width="15" Height="15" Stretch="Uniform"/>
+                    </Button>
+                </Grid>
+            </Border>
+            
+            <!-- Toolbar Actions: gap 2px -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,6,0">
+                <Button x:Name="AdBlockBtn" Click="AdBlock_Click" Style="{StaticResource AdBlockBtnStyle}"
+                        ToolTip="Ad blocker" VerticalAlignment="Center" Margin="0,0,2,0">
+                    <Grid Width="28" Height="28">
+                        <Viewbox x:Name="AdBlockOffIcon" Stretch="Uniform" Width="28" Height="28">
+                            <Canvas Width="24" Height="24">
+                                <Ellipse Canvas.Left="8" Canvas.Top="3" Width="8" Height="8"
+                                         Stroke="#9aa0a6" StrokeThickness="1.5" Fill="Transparent"/>
+                                <Ellipse Canvas.Left="9.6" Canvas.Top="5.7" Width="1.4" Height="1.4" Fill="#9aa0a6"/>
+                                <Ellipse Canvas.Left="13" Canvas.Top="5.7" Width="1.4" Height="1.4" Fill="#9aa0a6"/>
+                                <Path Data="M9.2 9.7 Q12 7.7 14.8 9.7"
+                                      Stroke="#9aa0a6" StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M12 11 L12 18"
+                                      Stroke="#9aa0a6" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M9.5 13.2 L7.3 18.4 M14.5 13.2 L16.7 18.4"
+                                      Stroke="#9aa0a6" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M12 14 L7.6 16.8 M12 14 L16.4 16.8"
+                                      Stroke="#9aa0a6" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                        <Viewbox x:Name="AdBlockOnIcon" Stretch="Uniform" Width="28" Height="28" Visibility="Collapsed">
+                            <Canvas Width="24" Height="24">
+                                <Ellipse Canvas.Left="8" Canvas.Top="3" Width="8" Height="8"
+                                         Stroke="#81c995" StrokeThickness="1.5" Fill="Transparent"/>
+                                <Ellipse Canvas.Left="9.6" Canvas.Top="5.7" Width="1.4" Height="1.4" Fill="#81c995"/>
+                                <Ellipse Canvas.Left="13" Canvas.Top="5.7" Width="1.4" Height="1.4" Fill="#81c995"/>
+                                <Path Data="M9.2 9.2 Q12 11.3 14.8 9.2"
+                                      Stroke="#81c995" StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Fill="Transparent"/>
+                                <Path Data="M12 11 L12 18"
+                                      Stroke="#81c995" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M9.5 13.2 L7.3 18.4 M14.5 13.2 L16.7 18.4"
+                                      Stroke="#81c995" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M12 14 L7.6 16.8 M12 14 L16.4 16.8"
+                                      Stroke="#81c995" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Grid>
+                </Button>
+
+                <!-- Sidebar Button -->
+                <Button x:Name="CopilotBtn" Click="Copilot_Click" Style="{StaticResource NavBtnStyle}" 
+                        ToolTip="Open browser sidebar">
+                    <Canvas Width="20" Height="20">
+                        <Ellipse Canvas.Left="5" Canvas.Top="3.33" Width="10" Height="10" 
+                                 Stroke="#9aa0a6" StrokeThickness="1.33" Fill="Transparent"/>
+                        <Ellipse Canvas.Left="6.67" Canvas.Top="6.25" Width="2.5" Height="2.5" Fill="#9aa0a6"/>
+                        <Ellipse Canvas.Left="10.83" Canvas.Top="6.25" Width="2.5" Height="2.5" Fill="#9aa0a6"/>
+                        <Path Canvas.Left="0" Canvas.Top="0" 
+                              Data="M7.5 10.42 Q10 12.08 12.5 10.42"
+                              Stroke="#9aa0a6" StrokeThickness="1" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        <Path Canvas.Left="0" Canvas.Top="0"
+                              Data="M6.67 13.33 Q3.33 15 3.33 16.67 L16.67 16.67 Q16.67 15 13.33 13.33"
+                              Stroke="#9aa0a6" StrokeThickness="1.17" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </Canvas>
+                </Button>
+                <Button x:Name="ExtensionsBtn" Click="ExtensionsBtn_Click" Style="{StaticResource NavBtnStyle}"
+                        ToolTip="Extensions">
+                    <Canvas Width="20" Height="20">
+                        <Path Data="M8 3 H13 C13.6 3 14 3.4 14 4 V7 H16 C17.1 7 18 7.9 18 9 C18 10.1 17.1 11 16 11 H14 V16 C14 16.6 13.6 17 13 17 H4 C3.4 17 3 16.6 3 16 V12 H5 C6.1 12 7 11.1 7 10 C7 8.9 6.1 8 5 8 H3 V4 C3 3.4 3.4 3 4 3 H7 V5 C7 6.1 7.9 7 9 7 C10.1 7 11 6.1 11 5 C11 3.9 10.1 3 9 3 H8 Z"
+                              Stroke="#9aa0a6" StrokeThickness="1.5" Fill="Transparent"
+                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </Canvas>
+                </Button>
+                
+                <!-- Incognito Indicator (shown only in incognito mode) -->
+                <Border x:Name="IncognitoPill" Visibility="Collapsed" 
+                        Background="#2a2b2f" CornerRadius="14" Padding="10,0,12,0" 
+                        Margin="2,9,2,9" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Canvas Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <Ellipse Canvas.Left="2" Canvas.Top="7.5" Width="4.5" Height="4.5" 
+                                     Stroke="#9aa0a6" StrokeThickness="1.3" Fill="Transparent"/>
+                            <Ellipse Canvas.Left="7.5" Canvas.Top="7.5" Width="4.5" Height="4.5" 
+                                     Stroke="#9aa0a6" StrokeThickness="1.3" Fill="Transparent"/>
+                            <Line X1="1" Y1="4" X2="13" Y2="4" Stroke="#9aa0a6" StrokeThickness="1.3" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <Line X1="0" Y1="9.75" X2="2" Y2="9.75" Stroke="#9aa0a6" StrokeThickness="1.3" StrokeStartLineCap="Round"/>
+                            <Line X1="12" Y1="9.75" X2="14" Y2="9.75" Stroke="#9aa0a6" StrokeThickness="1.3" StrokeEndLineCap="Round"/>
+                        </Canvas>
+                        <TextBlock Text="Incognito" Foreground="#9aa0a6" FontSize="12" 
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Menu Button (3 dots) -->
+                <Button x:Name="MenuBtn" Click="Menu_Click" Style="{StaticResource NavBtnStyle}" 
+                        ToolTip="Customize and control YCB">
+                    <Canvas Width="4" Height="18">
+                        <Ellipse x:Name="MenuDot1" Canvas.Left="0.5" Canvas.Top="0.5" Width="3" Height="3" Fill="#9aa0a6"/>
+                        <Ellipse x:Name="MenuDot2" Canvas.Left="0.5" Canvas.Top="7.5" Width="3" Height="3" Fill="#9aa0a6"/>
+                        <Ellipse x:Name="MenuDot3" Canvas.Left="0.5" Canvas.Top="14.5" Width="3" Height="3" Fill="#9aa0a6"/>
+                    </Canvas>
+                </Button>
+            </StackPanel>
+        </Grid>
+        
+        <!-- BOOKMARKS BAR - shown when enabled in settings -->
+        <Border x:Name="BookmarksBar" Grid.Row="2" Background="#292a2d" Visibility="Collapsed"
+                Padding="8,4">
+            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="BookmarksBarItems" Orientation="Horizontal"/>
+            </ScrollViewer>
+        </Border>
+        
+        <!-- INCOGNITO BAR - removed; indicator is now in toolbar -->
+        <Border x:Name="IncognitoBar" Grid.Row="3" Visibility="Collapsed"/>
+        
+        
+        <!-- MAIN CONTENT AREA -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="6"/>
+                <ColumnDefinition x:Name="SidebarColumn" Width="0"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- WebView Container -->
+            <Grid x:Name="WebViewContainer" Grid.Column="0" Background="#ffffff"/>
+
+            <GridSplitter x:Name="AiSidebarSplitter"
+                          Grid.Column="1"
+                          Width="6"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          ResizeBehavior="PreviousAndNext"
+                          Visibility="Collapsed"
+                          Cursor="SizeWE"
+                          DragCompleted="AiSidebarSplitter_DragCompleted"/>
+            
+            <!-- AI Sidebar: 340px, #1a1b26 -->
+            <Border x:Name="CopilotSidebar" Grid.Column="2" 
+                    Background="#1a1b26" Visibility="Collapsed">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1,0,0,0</Border.BorderThickness>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Header: padding 14px 16px 12px -->
+                    <Border x:Name="CopilotHeaderBorder" Grid.Row="0" Padding="16,14,16,12">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.02"/>
+                        </Border.Background>
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.BorderBrush>
+                        <Border.BorderThickness>0,0,0,1</Border.BorderThickness>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- AI Icon 22x22 in accent color -->
+                            <Canvas Grid.Column="0" Width="22" Height="22">
+                                <Ellipse Canvas.Left="5" Canvas.Top="3.67" Width="12" Height="11" 
+                                         Stroke="#8ab4f8" StrokeThickness="1.47" Fill="Transparent"/>
+                                <Ellipse Canvas.Left="7.33" Canvas.Top="6.83" Width="2.75" Height="2.75" Fill="#8ab4f8"/>
+                                <Ellipse Canvas.Left="11.92" Canvas.Top="6.83" Width="2.75" Height="2.75" Fill="#8ab4f8"/>
+                                <Path Data="M8.25 11.46 Q11 13.38 13.75 11.46"
+                                      Stroke="#8ab4f8" StrokeThickness="1.1" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M7.33 14.67 Q3.67 16.5 3.67 18.33 L18.33 18.33 Q18.33 16.5 14.67 14.67"
+                                      Stroke="#8ab4f8" StrokeThickness="1.28" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                            
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <TextBlock x:Name="CopilotTitleText" Text="Browser" Foreground="#e8eaed" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="CopilotSubtitleText" Text="Pick a service and use the website" Foreground="#9aa0a6" FontSize="11"/>
+                            </StackPanel>
+                            
+                            <!-- Close button: 28x28 rounded 6px -->
+                            <Button Grid.Column="2" Click="CloseCopilot_Click" Style="{StaticResource IconBtnStyle}">
+                                <Path Data="M1 1 L13 13 M13 1 L1 13" 
+                                      Stroke="#9aa0a6" StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Width="14" Height="14" Stretch="Uniform"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <Border x:Name="AiToolbarBorder" Grid.Row="1" Padding="12,10" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="AiToolbarLabel" Text="Service" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox x:Name="AiProviderCombo" Grid.Column="1" Height="30" VerticalAlignment="Center"
+                                      SelectionChanged="AiProviderCombo_SelectionChanged">
+                                <ComboBoxItem Tag="chatgpt">ChatGPT</ComboBoxItem>
+                                <ComboBoxItem Tag="gemini">Gemini</ComboBoxItem>
+                                <ComboBoxItem Tag="claude">Claude</ComboBoxItem>
+                                <ComboBoxItem Tag="microsoft-copilot">Microsoft Copilot</ComboBoxItem>
+                                <ComboBoxItem Tag="grok">Grok</ComboBoxItem>
+                                <ComboBoxItem Tag="meta-ai">Meta AI</ComboBoxItem>
+                                <ComboBoxItem Tag="github-copilot">GitHub Copilot</ComboBoxItem>
+                                <ComboBoxItem Tag="perplexity">Perplexity AI</ComboBoxItem>
+                                <ComboBoxItem Tag="deepseek">DeepSeek</ComboBoxItem>
+                            </ComboBox>
+                            <Button x:Name="AiOpenTabBtn" Grid.Column="2" Content="Open in tab" Click="AiOpenTabBtn_Click"
+                                    Margin="10,0,0,0" Padding="12,6" BorderThickness="1"/>
+                            <Button x:Name="AiRefreshBtn" Grid.Column="3" Content="Refresh" Click="AiRefreshBtn_Click"
+                                    Margin="8,0,0,0" Padding="12,6" BorderThickness="1"/>
+                            <Button x:Name="AiHomeBtn" Grid.Column="4" Content="Home" Click="AiHomeBtn_Click"
+                                    Margin="8,0,0,0" Padding="12,6" BorderThickness="1"/>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Row="2" x:Name="AiWebHost" Background="Transparent">
+                        <wv2:WebView2 x:Name="AiWebView"/>
+                    </Border>
+                    <Grid Visibility="Collapsed" IsHitTestVisible="False">
+                        <ScrollViewer x:Name="CopilotMessages">
+                            <StackPanel x:Name="MessagesPanel"/>
+                        </ScrollViewer>
+                        <Border x:Name="CopilotInputAreaBorder">
+                            <Border x:Name="CopilotInputFieldBorder">
+                                <TextBox x:Name="CopilotInput"/>
+                            </Border>
+                        </Border>
+                        <Border x:Name="ImageAttachIndicator">
+                            <TextBlock x:Name="ImageAttachName"/>
+                        </Border>
+                        <Button x:Name="ImageAttachBtn"/>
+                        <Popup x:Name="ImagePickerPopup"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+        
+        <!-- DOWNLOAD SHELF - #2d2e31, height 68px -->
+        <Border Grid.Row="5" x:Name="DownloadShelf" Background="#2d2e31" Visibility="Collapsed">
+            <Border.BorderBrush>
+                <SolidColorBrush Color="#FFFFFF" Opacity="0.1"/>
+            </Border.BorderBrush>
+            <Border.BorderThickness>0,1,0,0</Border.BorderThickness>
+            <Grid Height="68">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="DownloadItems" Orientation="Horizontal" Margin="12,0"/>
+                </ScrollViewer>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,12,0" VerticalAlignment="Center">
+                    <Button Content="See all downloads" Click="SeeAllDownloads_Click" Style="{StaticResource LinkBtnStyle}"/>
+                    <Button Click="CloseDownloadShelf_Click" Style="{StaticResource IconBtnStyle}" Margin="6,0,0,0">
+                        <Path Data="M1 1 L9 9 M9 1 L1 9" 
+                              Stroke="#9aa0a6" StrokeThickness="1.5"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Width="10" Height="10" Stretch="Uniform"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- MENU POPUP - #2d2e31, border-radius 6px, shadow -->
+        <Popup x:Name="MenuPopup" StaysOpen="False" Placement="Bottom" 
+               PlacementTarget="{Binding ElementName=MenuBtn}" 
+               AllowsTransparency="True" HorizontalOffset="-180">
+            <Border x:Name="MenuPopupBorder" Background="#2d2e31" CornerRadius="6" Padding="0,6" MinWidth="220">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="#FFFFFF" Opacity="0.07"/>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" Opacity="0.6" ShadowDepth="6" Color="#000000"/>
+                </Border.Effect>
+                <StackPanel>
+                    <Button Click="MenuNewTab_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="New tab" HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+T" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="12"/>
+                        </Grid>
+                    </Button>
+                    <Button Click="MenuNewWindow_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="New window" HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+N" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="12"/>
+                        </Grid>
+                    </Button>
+                    <Button Click="MenuNewIncognitoWindow_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="New incognito window" HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+Shift+N" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="11"/>
+                        </Grid>
+                    </Button>
+                    <Border Height="1" Margin="0,4">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button Click="MenuSettings_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Settings"/>
+                    </Button>
+                    <Button Click="MenuExtensions_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Extensions"/>
+                    </Button>
+                    <Border x:Name="MenuAdBlockSeparator" Height="1" Margin="0,4" Visibility="Collapsed">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button x:Name="MenuAdBlockToggle" Click="MenuAdBlockToggle_Click" Style="{StaticResource MenuItemStyle}"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="MenuAdBlockToggleText" Text="Disable ad blocker"/>
+                    </Button>
+                    <Button Click="MenuBookmarks_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Bookmarks"/>
+                    </Button>
+                    <Button Click="MenuHistory_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="History" HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+H" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="12"/>
+                        </Grid>
+                    </Button>
+                    <Button Click="MenuDownloads_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="Downloads" HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+J" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="12"/>
+                        </Grid>
+                    </Button>
+                    <Button Click="MenuProfiles_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Profiles"/>
+                    </Button>
+ <Button Click="MenuPasswords_Click" Style="{StaticResource MenuItemStyle}">
+                            <TextBlock Text="Password Manager"/>
+                    </Button>
+                    <Border Height="1" Margin="0,4">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button Click="ZoomIn_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Zoom in"/>
+                    </Button>
+                    <Button Click="ZoomOut_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Zoom out"/>
+                    </Button>
+                    <Border Height="1" Margin="0,4">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button Click="Print_Click" Style="{StaticResource MenuItemStyle}">
+                        <Grid Width="184">
+                            <TextBlock Text="Print..." HorizontalAlignment="Left"/>
+                            <TextBlock Text="Ctrl+P" HorizontalAlignment="Right" Foreground="#9aa0a6" FontSize="12"/>
+                        </Grid>
+                    </Button>
+                    <Border Height="1" Margin="0,4">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button x:Name="ThemeToggle" Click="ToggleTheme_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Light Mode"/>
+                    </Button>
+                    <Border Height="1" Margin="0,4">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <Button Click="MenuGuide_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Help &amp; Guide"/>
+                    </Button>
+                    <Button Click="MenuSupport_Click" Style="{StaticResource MenuItemStyle}">
+                        <TextBlock Text="Support"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- BOOKMARKS POPUP -->
+        <Popup x:Name="BookmarksPopup" StaysOpen="False" Placement="Bottom"
+               PlacementTarget="{Binding ElementName=MenuBtn}"
+               AllowsTransparency="True" HorizontalOffset="-180">
+            <Border Background="#2d2e31" CornerRadius="6" Padding="14,12" MinWidth="300" MaxWidth="360">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="#FFFFFF" Opacity="0.07"/>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" Opacity="0.6" ShadowDepth="6" Color="#000000"/>
+                </Border.Effect>
+                <StackPanel>
+                    <!-- Bookmark this page -->
+                    <TextBlock Text="Bookmark this page" FontSize="12" FontWeight="SemiBold"
+                               Foreground="#9aa0a6" Margin="0,0,0,8"/>
+                    <TextBox x:Name="BookmarkNameBox"
+                             Background="#3c3d41" Foreground="#e8eaed" BorderThickness="1"
+                             Padding="8,6" Margin="0,0,0,6" FontSize="13"
+                             CaretBrush="#e8eaed">
+                        <TextBox.BorderBrush>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.15"/>
+                        </TextBox.BorderBrush>
+                        <TextBox.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="5"/>
+                            </Style>
+                        </TextBox.Resources>
+                    </TextBox>
+                    <Button x:Name="BookmarkSaveBtn" Click="BookmarkSaveBtn_Click"
+                            Background="#1a73e8" Foreground="White" BorderThickness="0"
+                            Padding="0,8" FontSize="13" Cursor="Hand" HorizontalContentAlignment="Center">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="5"/>
+                            </Style>
+                        </Button.Resources>
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="5"
+                                        Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="Save bookmark" FontSize="13"/>
+                    </Button>
+                    <!-- Divider -->
+                    <Border Height="1" Margin="0,12,0,8">
+                        <Border.Background>
+                            <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                        </Border.Background>
+                    </Border>
+                    <TextBlock Text="Saved bookmarks" FontSize="12" FontWeight="SemiBold"
+                               Foreground="#9aa0a6" Margin="0,0,0,6"/>
+                    <!-- Bookmarks list -->
+                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="BookmarksList"/>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- OMNIBAR SUGGESTIONS POPUP -->
+        <Popup x:Name="SuggestPopup" StaysOpen="False" Placement="Bottom"
+               PlacementTarget="{Binding ElementName=OmniboxBorder}"
+               AllowsTransparency="True" PopupAnimation="Fade"
+               VerticalOffset="4"
+               Width="{Binding ActualWidth, ElementName=OmniboxBorder}">
+            <Border x:Name="SuggestBorder" Background="#2d2e31" CornerRadius="0,0,8,8" Padding="0,4">
+                <Border.BorderBrush>
+                    <SolidColorBrush Color="#FFFFFF" Opacity="0.08"/>
+                </Border.BorderBrush>
+                <Border.BorderThickness>1</Border.BorderThickness>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" Opacity="0.55" ShadowDepth="5" Color="#000000"/>
+                </Border.Effect>
+                <ListBox x:Name="SuggestionsList"
+                         Background="Transparent" BorderThickness="0"
+                         MaxHeight="320"
+                         FocusVisualStyle="{x:Null}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         PreviewMouseLeftButtonDown="SuggestionsList_MouseDown"
+                         KeyDown="SuggestionsList_KeyDown"
+                         SelectionMode="Single">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="#e8eaed"/>
+                            <Setter Property="Padding" Value="12,7"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#3c4043"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#3c4043"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Viewbox Grid.Column="0" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="16" Height="16">
+                                        <Path Data="{Binding IconPath}" Stroke="{Binding IconColor}" Fill="Transparent"
+                                              StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <StackPanel Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Primary}" FontSize="13" Foreground="{Binding PrimaryColor}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Secondary}" FontSize="11" Foreground="{Binding SecondaryColor}" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding SecondaryVisibility}"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Popup>
+    </Grid>
+</Window>

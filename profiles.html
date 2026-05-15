@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Who&apos;s using YCB?</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg: #ffffff;
+      --panel: #f8f9fa;
+      --panel-2: #eef1f4;
+      --text: #111111;
+      --text-2: #111111;
+      --text-3: rgba(17,17,17,0.62);
+      --border: #dfe1e5;
+      --hover: rgba(0,0,0,0.06);
+      --blue: #1a73e8;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+    }
+    body.dark {
+      --bg: #202124;
+      --panel: #2d2e31;
+      --panel-2: #35363a;
+      --text: #f8f9fa;
+      --text-2: #f8f9fa;
+      --text-3: rgba(248,249,250,0.68);
+      --border: rgba(255,255,255,0.12);
+      --hover: rgba(255,255,255,0.08);
+      --blue: #8ab4f8;
+      --shadow: 0 1px 6px rgba(0,0,0,0.35);
+    }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(circle at 8% 22%, rgba(66,133,244,0.08) 0 28px, transparent 29px),
+        radial-gradient(circle at 92% 22%, rgba(251,188,5,0.08) 0 28px, transparent 29px),
+        radial-gradient(circle at 8% 70%, rgba(52,168,83,0.08) 0 24px, transparent 25px),
+        radial-gradient(circle at 92% 70%, rgba(234,67,53,0.08) 0 24px, transparent 25px),
+        var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .wrap {
+      width: min(920px, calc(100vw - 48px));
+      text-align: center;
+      position: relative;
+      padding: 64px 24px 30px;
+    }
+    .logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      margin: 0 auto 18px;
+      background: linear-gradient(135deg, #5b9bf9, #4b7bec);
+      box-shadow: var(--shadow);
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.05em;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 42px);
+      font-weight: 400;
+      letter-spacing: -0.03em;
+    }
+    .sub {
+      margin: 12px auto 0;
+      max-width: 650px;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    .grid {
+      margin: 44px auto 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+      gap: 18px;
+      max-width: 660px;
+    }
+    .card, .add-card {
+      position: relative;
+      min-height: 190px;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 18px 16px 16px;
+      cursor: pointer;
+      text-align: center;
+      transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+    }
+    .card:hover, .add-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      background: color-mix(in srgb, var(--panel-2) 92%, transparent);
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 2px 0 14px;
+      color: var(--text);
+    }
+    .avatar {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      margin: 4px auto 14px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 36px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.16);
+    }
+    .card-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 12px;
+      color: var(--text-2);
+      line-height: 1.35;
+    }
+    .dots {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      color: var(--text-2);
+      font-size: 20px;
+      line-height: 1;
+      opacity: .7;
+    }
+    .add-card {
+      border-style: dashed;
+      background: transparent;
+    }
+    .plus {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      margin: 6px auto 14px;
+      display: grid;
+      place-items: center;
+      background: color-mix(in srgb, var(--panel) 88%, transparent);
+      color: var(--text-2);
+      font-size: 42px;
+      font-weight: 300;
+    }
+    .startup {
+      position: fixed;
+      right: 24px;
+      bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-2);
+      font-size: 14px;
+      background: color-mix(in srgb, var(--panel) 96%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 14px;
+      box-shadow: var(--shadow);
+    }
+    .startup input { accent-color: var(--blue); width: 16px; height: 16px; }
+    .small-note {
+      margin-top: 20px;
+      color: var(--text-3);
+      font-size: 12px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.28);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal.open { display: flex; }
+    .panel {
+      width: min(420px, 100%);
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      text-align: left;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .panel label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-2);
+      margin: 14px 0 6px;
+    }
+    .panel input[type="text"] {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+    }
+    .panel input[type="text"]:focus { border-color: var(--blue); }
+    .panel .hint {
+      margin-top: 6px;
+      color: var(--text-3);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--blue); color: #fff; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; max-width: 380px; }
+      .wrap { padding-top: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">Y</div>
+    <h1>Who's using YCB?</h1>
+    <div class="sub">Choose a profile to keep your bookmarks, extensions, passwords, and settings separate. Add a new one with a name and an optional icon.</div>
+
+    <div class="grid" id="profile-grid">
+      <div class="card" data-action="default" id="current-profile-card">
+        <div class="dots">⋮</div>
+        <div class="card-title">Your YCB</div>
+        <div class="avatar" id="current-avatar">Y</div>
+        <div class="card-name" id="current-name">Current profile</div>
+        <div class="card-sub" id="current-sub">Open your browser with the saved profile</div>
+      </div>
+
+      <div class="add-card" id="add-profile-card">
+        <div class="card-title">Add</div>
+        <div class="plus">+</div>
+        <div class="card-name">Create profile</div>
+        <div class="card-sub">Make another browser profile</div>
+      </div>
+    </div>
+
+    <div class="small-note">Tip: use the profile button in the top-right of a new tab to switch fast.</div>
+  </div>
+
+  <div class="modal" id="add-modal">
+    <div class="panel">
+      <h2>Create profile</h2>
+      <label for="profile-name">Profile name</label>
+      <input id="profile-name" type="text" placeholder="Work, School, Family...">
+      <label for="profile-icon">Icon or image URL (optional)</label>
+      <input id="profile-icon" type="text" placeholder="Emoji, image URL, or short icon">
+      <div class="hint">If you leave this blank, YCB will use the first letter of the profile name.</div>
+      <div class="actions">
+        <button class="btn ghost" id="cancel-add">Cancel</button>
+        <button class="btn primary" id="save-add">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROFILE_KEY = 'ycb_profiles';
+    const savedTheme = localStorage.getItem('browser_theme') || 'light';
+    if (savedTheme === 'dark') document.body.classList.add('dark');
+
+    const fallbackProfile = {
+      name: 'Current profile',
+      initial: 'Y',
+      icon: '',
+      color: '#5b9bf9',
+      startupMode: 'newtab',
+      showOnStartup: false
+    };
+
+    const palette = ['#5b9bf9', '#ea4335', '#34a853', '#fbbc05', '#8e44ad', '#1a73e8'];
+    let currentProfile = { ...fallbackProfile };
+    function looksLikeImage(value) {
+      const v = (value || '').trim();
+      return /^https?:\/\//i.test(v) || /^data:image\//i.test(v) || /^file:\/\//i.test(v) || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(v);
+    }
+
+    function avatarMarkup(profile) {
+      const icon = (profile?.icon || '').trim();
+      const initial = (profile?.initial || profile?.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+      if (!icon) {
+        return `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.25" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M5 19c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>`;
+      }
+      if (looksLikeImage(icon)) {
+        return `<img src="${icon}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+      }
+      return icon.length <= 2 ? icon : initial;
+    }
+
+    function post(payload) {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(JSON.stringify(payload));
+      }
+    }
+
+    function renderExtras() {
+      const grid = document.getElementById('profile-grid');
+      const addCard = document.getElementById('add-profile-card');
+      grid.querySelectorAll('.saved-profile').forEach(el => el.remove());
+
+      const saved = Array.isArray(currentProfile.profiles) ? currentProfile.profiles : [];
+      saved.forEach(profile => {
+        const card = document.createElement('div');
+        card.className = 'card saved-profile';
+        card.dataset.action = 'profile';
+        card.style.cursor = 'pointer';
+        const avatar = avatarMarkup(profile);
+        card.innerHTML = `
+          <div class="dots">⋮</div>
+          <div class="card-title">${profile.name || 'Profile'}</div>
+          <div class="avatar" style="background:${profile.color || '#5b9bf9'}">${avatar}</div>
+          <div class="card-name">${profile.name || 'Profile'}</div>
+          <div class="card-sub">Open this browser profile</div>`;
+        card.addEventListener('click', () => {
+          post({ type: 'profiles:open', target: 'default', source: 'boot', name: profile.name, initial: profile.initial, color: profile.color, icon: profile.icon });
+        });
+        grid.insertBefore(card, addCard);
+      });
+    }
+
+    function openModal() {
+      document.getElementById('profile-name').value = '';
+      document.getElementById('profile-icon').value = '';
+      document.getElementById('add-modal').classList.add('open');
+      setTimeout(() => document.getElementById('profile-name').focus(), 0);
+    }
+    function closeModal() {
+      document.getElementById('add-modal').classList.remove('open');
+    }
+
+    document.getElementById('current-profile-card').addEventListener('click', () => {
+      post({ type: 'profiles:open', target: 'default', source: 'boot', name: currentProfile.name, initial: currentProfile.initial, color: currentProfile.color, icon: currentProfile.icon });
+    });
+    document.getElementById('add-profile-card').addEventListener('click', openModal);
+    document.getElementById('cancel-add').addEventListener('click', closeModal);
+    document.getElementById('add-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('add-modal')) closeModal();
+    });
+    document.getElementById('save-add').addEventListener('click', () => {
+      const input = document.getElementById('profile-name');
+      const iconInput = document.getElementById('profile-icon');
+      const name = (input.value || '').trim();
+      if (!name) return input.focus();
+      const icon = (iconInput.value || '').trim();
+      const initial = name.charAt(0).toUpperCase();
+      const saved = Array.isArray(currentProfile.profiles) ? currentProfile.profiles : [];
+      const color = palette[saved.length % palette.length];
+      const profile = { name, initial, color, icon };
+      closeModal();
+      post({ type: 'profiles:create', source: 'boot', name, initial, color, icon });
+    });
+    document.getElementById('profile-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('save-add').click();
+      if (e.key === 'Escape') closeModal();
+    });
+    document.getElementById('profile-icon').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('save-add').click();
+      if (e.key === 'Escape') closeModal();
+    });
+
+    function applyProfileInfo(info) {
+      if (!info) return;
+      currentProfile.name = (info.name || currentProfile.name || 'Current profile').toString();
+      currentProfile.initial = (info.initial || currentProfile.name || 'Y').toString().trim().charAt(0).toUpperCase() || 'Y';
+      currentProfile.color = info.color || currentProfile.color || '#5b9bf9';
+      currentProfile.icon = (info.icon || '').toString().trim();
+      if (Array.isArray(info.profiles)) {
+        currentProfile.profiles = info.profiles;
+      }
+      const avatar = document.getElementById('current-avatar');
+      const name = document.getElementById('current-name');
+      const sub = document.getElementById('current-sub');
+      if (avatar) {
+        avatar.innerHTML = avatarMarkup(currentProfile);
+        avatar.style.background = currentProfile.color;
+      }
+      if (name) name.textContent = currentProfile.name;
+      if (sub) sub.textContent = 'Open YCB with this profile';
+    }
+    window.setProfileInfo = applyProfileInfo;
+    window.setProfileState = applyProfileInfo;
+    window.setProfilesState = function(state) {
+      if (!state) return;
+      if (state.name || state.initial || state.color || state.icon) applyProfileInfo(state);
+      if (Array.isArray(state.profiles)) currentProfile.profiles = state.profiles;
+      renderExtras();
+    };
+    window.setTheme = function(theme) {
+      localStorage.setItem('browser_theme', theme);
+      document.body.classList.toggle('dark', theme === 'dark');
+    };
+
+    renderExtras();
+    post({ type: 'profiles:getState' });
+  </script>
+</body>
+</html>
