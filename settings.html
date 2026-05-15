@@ -381,7 +381,7 @@
         <div class="row">
           <div class="row-left">
             <div class="row-title">Update source</div>
-            <div class="row-desc">Manifest: GitHub update file. Installer: official YCB download.</div>
+            <div class="row-desc">Manifest: GitHub update file. Installer: GitHub release asset.</div>
           </div>
           <button class="btn btn-outline" id="update-recheck-btn" type="button">Check again</button>
         </div>
@@ -1005,8 +1005,8 @@
 
   window.loadUpdateManifestError = function(message) {
     if (updateStatusTitle) updateStatusTitle.textContent = 'Could not check GitHub for updates';
-    if (updateStatusDesc) updateStatusDesc.textContent = 'YCB could not read the GitHub update file. Check your connection and try again.';
-    if (updateSummary) updateSummary.textContent = message ? String(message) : 'GitHub update check failed.';
+      if (updateStatusDesc) updateStatusDesc.textContent = 'YCB could not read the GitHub update file from GitHub. Check your connection and try again.';
+      if (updateSummary) updateSummary.textContent = message ? String(message) : 'GitHub update check failed.';
     if (updateChanges) updateChanges.innerHTML = '';
     if (updateActionBtn) {
       updateActionBtn.disabled = true;
@@ -1029,7 +1029,7 @@
 
   if (updateActionBtn) updateActionBtn.addEventListener('click', () => {
     if (!latestUpdateManifest) return;
-    const url = latestUpdateManifest.installer_url || latestUpdateManifest.installerUrl || 'https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.24/YCB-Setup.zip';
+    const url = latestUpdateManifest.installer_url || latestUpdateManifest.installerUrl || 'https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.25/YCB-Setup.zip';
     if (window.chrome && window.chrome.webview) {
       window.chrome.webview.postMessage(JSON.stringify({ type: 'updates:openInstaller', url }));
     } else {
