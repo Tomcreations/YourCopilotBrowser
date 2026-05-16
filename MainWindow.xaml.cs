@@ -66,8 +66,8 @@ public partial class MainWindow : Window
     private string _extensionsStatePath = "";
     private string _bitwardenCliAppDataDir = "";
     private string _sessionPath = "";
-    private const string AppVersion = "1.0.26";
-    private const string EmbeddedContentStamp = "2026-05-16-updater-v24";
+    private const string AppVersion = "1.0.27";
+    private const string EmbeddedContentStamp = "2026-05-16-updater-v25";
     private const string InternalHostName = "ycb.local";
     private const string InternalOrigin = "https://ycb.local/";
     private Settings _settings = new();

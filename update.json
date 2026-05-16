@@ -1,15 +1,13 @@
 {
-  "version": "1.0.26",
+  "version": "1.0.27",
   "channel": "stable",
   "published": "2026-05-16",
-  "installer_url": "https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.26/YCB-Setup.exe",
+  "installer_url": "https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.27/YCB-Setup.exe",
   "source_url": "https://github.com/Tomcreations/YourCopilotBrowser",
-  "summary": "This update cleans up the new tab search bar, improves rapid tab closing, removes the broken cookie import feature, and adds update checking inside Settings.",
+  "summary": "This update keeps the updater GitHub-only, downloads the installer directly from the GitHub release, and refreshes the package so stale installs are easier to replace.",
   "changes": [
-    "Removed the microphone and grid buttons from the new tab search bar.",
-    "Rapidly closing tabs now waits briefly before resizing the tab strip, so the close button stays easier to hit.",
-    "Removed cookie import from Settings because modern browser cookies are encrypted per browser profile and importing them was unreliable.",
-    "Added a Settings update page that reads this GitHub update file and shows users what changed before updating.",
-    "Kept the latest installer link connected to the official YCB download."
+    "The updater reads the GitHub manifest and downloads the matching GitHub release installer.",
+    "The package version was bumped so reinstalling clearly replaces stale builds.",
+    "The update page now points at the GitHub release asset for the current version."
   ]
 }
