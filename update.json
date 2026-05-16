@@ -4,10 +4,10 @@
   "published": "2026-05-16",
   "installer_url": "https://raw.githubusercontent.com/Tomcreations/YourCopilotBrowser/main/source/YCB-Setup.exe",
   "source_url": "https://github.com/Tomcreations/YourCopilotBrowser",
-  "summary": "This update keeps the updater GitHub-only, downloads the installer directly from the GitHub release, and refreshes the package so stale installs are easier to replace.",
+  "summary": "This update keeps the updater GitHub-only, downloads the package directly from raw GitHub, and refreshes the build so stale installs are easier to replace.",
   "changes": [
-    "The updater reads the GitHub manifest and downloads the matching GitHub release installer.",
+    "The updater reads the GitHub manifest and downloads the matching raw GitHub package.",
     "The package version was bumped so reinstalling clearly replaces stale builds.",
-    "The update page now points at the GitHub release asset for the current version."
+    "The update page now points at the raw GitHub package for the current version."
   ]
 }
