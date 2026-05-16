@@ -66,7 +66,7 @@ public partial class MainWindow : Window
     private string _extensionsStatePath = "";
     private string _bitwardenCliAppDataDir = "";
     private string _sessionPath = "";
-    private const string AppVersion = "1.0.25";
+    private const string AppVersion = "1.0.26";
     private const string EmbeddedContentStamp = "2026-05-16-updater-v24";
     private const string InternalHostName = "ycb.local";
     private const string InternalOrigin = "https://ycb.local/";
@@ -2929,7 +2929,7 @@ public partial class MainWindow : Window
                         var updateUrl = updateUrlElement.GetString();
                         if (!string.IsNullOrWhiteSpace(updateUrl))
                         {
-                            await Dispatcher.InvokeAsync(() => _ = CreateTab(updateUrl));
+                            await DownloadAndRunUpdateInstallerAsync(updateUrl);
                         }
                     }
                     break;
@@ -10670,6 +10670,36 @@ FROM cookies";
         try { return await TryRawAsync(); }
         catch { }
         return await TryContentsApiAsync();
+    }
+
+    private async Task DownloadAndRunUpdateInstallerAsync(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            throw new InvalidOperationException("Missing installer URL");
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("YCB/1.0");
+
+        var uri = new Uri(url);
+        var fileName = IoPath.GetFileName(uri.AbsolutePath);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = "YCB-Setup.exe";
+
+        var targetPath = IoPath.Combine(IoPath.GetTempPath(), fileName);
+        using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        await using (var source = await response.Content.ReadAsStreamAsync())
+        await using (var target = File.Create(targetPath))
+        {
+            await source.CopyToAsync(target);
+        }
+
+        Process.Start(new ProcessStartInfo(targetPath)
+        {
+            UseShellExecute = true,
+            WorkingDirectory = IoPath.GetDirectoryName(targetPath) ?? IoPath.GetTempPath()
+        });
     }
     
     private void UpdateBookmarksBar()

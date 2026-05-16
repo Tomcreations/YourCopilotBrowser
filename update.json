@@ -1,8 +1,8 @@
 {
-  "version": "1.0.25",
+  "version": "1.0.26",
   "channel": "stable",
   "published": "2026-05-16",
-  "installer_url": "https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.25/YCB-Setup.zip",
+  "installer_url": "https://github.com/Tomcreations/YourCopilotBrowser/releases/download/v1.0.26/YCB-Setup.exe",
   "source_url": "https://github.com/Tomcreations/YourCopilotBrowser",
   "summary": "This update cleans up the new tab search bar, improves rapid tab closing, removes the broken cookie import feature, and adds update checking inside Settings.",
   "changes": [
