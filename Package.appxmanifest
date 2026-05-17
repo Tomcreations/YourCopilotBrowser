@@ -10,7 +10,7 @@
   <Properties>
     <DisplayName>YCB Browser</DisplayName>
     <PublisherDisplayName>Tom Creations</PublisherDisplayName>
-    <Logo>YCB.png</Logo>
+    <Logo>StoreAssets\StoreLogo.png</Logo>
     <Description>YCB Browser</Description>
   </Properties>
   <Dependencies>
@@ -26,8 +26,8 @@
       <uap:VisualElements
         DisplayName="YCB Browser"
         Description="YCB Browser"
-        Square150x150Logo="YCB.png"
-        Square44x44Logo="YCB.png"
+        Square150x150Logo="StoreAssets\Square150x150Logo.png"
+        Square44x44Logo="StoreAssets\Square44x44Logo.png"
         BackgroundColor="transparent" />
       <Extensions>
         <desktop:Extension Category="windows.fullTrustProcess" Executable="YCB.exe" />
