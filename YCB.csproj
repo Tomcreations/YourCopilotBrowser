@@ -25,6 +25,12 @@
   <ItemGroup>
     <Resource Include="icon.ico" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="icon.ico">
+      <LogicalName>renderer/static/img/favicon.ico</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
   
   <ItemGroup>
     <EmbeddedResource Include="newtab.html">

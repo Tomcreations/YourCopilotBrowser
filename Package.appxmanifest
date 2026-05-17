@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap desktop rescap">
+  <Identity Name="TomCreations.YCBBrowser"
+            Publisher="CN=Tom Creations"
+            Version="1.0.27.0" />
+  <Properties>
+    <DisplayName>YCB Browser</DisplayName>
+    <PublisherDisplayName>Tom Creations</PublisherDisplayName>
+    <Logo>YCB.png</Logo>
+    <Description>YCB Browser</Description>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Applications>
+    <Application Id="YCB"
+                 Executable="YCB.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="YCB Browser"
+        Description="YCB Browser"
+        Square150x150Logo="YCB.png"
+        Square44x44Logo="YCB.png"
+        BackgroundColor="transparent" />
+      <Extensions>
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="YCB.exe" />
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <Capability Name="internetClient" />
+  </Capabilities>
+</Package>

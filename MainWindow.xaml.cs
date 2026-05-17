@@ -67,7 +67,7 @@ public partial class MainWindow : Window
     private string _bitwardenCliAppDataDir = "";
     private string _sessionPath = "";
     private const string AppVersion = "1.0.27";
-    private const string EmbeddedContentStamp = "2026-05-16-updater-v25";
+    private const string EmbeddedContentStamp = "2026-05-17-cleanup-v1";
     private const string InternalHostName = "ycb.local";
     private const string InternalOrigin = "https://ycb.local/";
     private Settings _settings = new();
@@ -179,12 +179,12 @@ public partial class MainWindow : Window
 
     private void EnsureRendererExtracted()
     {
-        ExtractEmbeddedFolder("renderer/", RendererPath, force: false);
+        ExtractEmbeddedFolder("renderer/", RendererPath, force: true);
     }
 
     private void EnsureUBlockOriginExtracted()
     {
-        ExtractEmbeddedFolder("ublock/", BrowserExtensionsPath, force: false);
+        ExtractEmbeddedFolder("ublock/", BrowserExtensionsPath, force: true);
     }
 
     private void ExtractEmbeddedFolder(string resourcePrefix, string outDir, bool force)
@@ -2920,34 +2920,6 @@ public partial class MainWindow : Window
                                 }};
                             }})();
                         ");
-                    }
-                    break;
-
-                case "updates:openInstaller":
-                    if (message.TryGetValue("url", out var updateUrlElement))
-                    {
-                        var updateUrl = updateUrlElement.GetString();
-                        if (!string.IsNullOrWhiteSpace(updateUrl))
-                        {
-                            await DownloadAndRunUpdateInstallerAsync(updateUrl);
-                        }
-                    }
-                    break;
-
-                case "updates:getManifest":
-                    if (sender is CoreWebView2 updateWv)
-                    {
-                        try
-                        {
-                            var manifestJson = await ResolveUpdateManifestJsonAsync();
-                            var safeManifest = JsonSerializer.Serialize(manifestJson);
-                            await updateWv.ExecuteScriptAsync($"window.loadUpdateManifest && window.loadUpdateManifest({safeManifest})");
-                        }
-                        catch (Exception ex)
-                        {
-                            var safeError = JsonSerializer.Serialize(ex.Message);
-                            await updateWv.ExecuteScriptAsync($"window.loadUpdateManifestError && window.loadUpdateManifestError({safeError})");
-                        }
                     }
                     break;
 
@@ -10627,81 +10599,6 @@ FROM cookies";
         }
     }
 
-    private async Task<string> ResolveUpdateManifestJsonAsync()
-    {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("YCB/1.0");
-
-        async Task<string> TryRawAsync()
-        {
-            const string rawUrl = "https://raw.githubusercontent.com/Tomcreations/YourCopilotBrowser/main/update.json";
-            var resp = await http.GetAsync(rawUrl);
-            if (!resp.IsSuccessStatusCode)
-                throw new HttpRequestException($"GitHub raw returned HTTP {(int)resp.StatusCode}");
-            var remote = await resp.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(remote))
-                throw new HttpRequestException("GitHub raw manifest was empty");
-            return remote;
-        }
-
-        async Task<string> TryContentsApiAsync()
-        {
-            const string apiUrl = "https://api.github.com/repos/Tomcreations/YourCopilotBrowser/contents/update.json?ref=main";
-            using var req = new HttpRequestMessage(HttpMethod.Get, apiUrl);
-            req.Headers.Accept.ParseAdd("application/vnd.github+json");
-            var resp = await http.SendAsync(req);
-            if (!resp.IsSuccessStatusCode)
-                throw new HttpRequestException($"GitHub API returned HTTP {(int)resp.StatusCode}");
-            var json = await resp.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(json))
-                throw new HttpRequestException("GitHub API manifest was empty");
-
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("content", out var contentEl))
-                throw new HttpRequestException("GitHub API response did not include file content");
-            var base64 = contentEl.GetString() ?? "";
-            if (string.IsNullOrWhiteSpace(base64))
-                throw new HttpRequestException("GitHub API content was empty");
-            base64 = base64.Replace("\n", "").Replace("\r", "");
-            var bytes = Convert.FromBase64String(base64);
-            return Encoding.UTF8.GetString(bytes);
-        }
-
-        try { return await TryRawAsync(); }
-        catch { }
-        return await TryContentsApiAsync();
-    }
-
-    private async Task DownloadAndRunUpdateInstallerAsync(string url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            throw new InvalidOperationException("Missing installer URL");
-
-        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("YCB/1.0");
-
-        var uri = new Uri(url);
-        var fileName = IoPath.GetFileName(uri.AbsolutePath);
-        if (string.IsNullOrWhiteSpace(fileName))
-            fileName = "YCB-Setup.exe";
-
-        var targetPath = IoPath.Combine(IoPath.GetTempPath(), fileName);
-        using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        await using (var source = await response.Content.ReadAsStreamAsync())
-        await using (var target = File.Create(targetPath))
-        {
-            await source.CopyToAsync(target);
-        }
-
-        Process.Start(new ProcessStartInfo(targetPath)
-        {
-            UseShellExecute = true,
-            WorkingDirectory = IoPath.GetDirectoryName(targetPath) ?? IoPath.GetTempPath()
-        });
-    }
-    
     private void UpdateBookmarksBar()
     {
         if (_settings.BookmarksBarVisible)

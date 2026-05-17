@@ -1,0 +1,21 @@
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{7EBC5F3A-9D12-4D33-8DBF-3A8C9B8F5C31}</ProjectGuid>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <AppxBundle>Always</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <AppxPackageSigningEnabled>true</AppxPackageSigningEnabled>
+    <AppInstallerUri />
+    <UapAppxPackageBuildMode>StoreUpload</UapAppxPackageBuildMode>
+    <PackageCertificateThumbprint />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="YCB.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest" />
+  </ItemGroup>
+</Project>
